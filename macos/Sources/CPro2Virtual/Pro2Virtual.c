@@ -3,6 +3,7 @@
 #include <IOKit/hidsystem/IOHIDUserDevice.h>
 #include <IOKit/hid/IOHIDKeys.h>
 #include <mach/mach_time.h>
+#include <dispatch/dispatch.h>
 #include <stdlib.h>
 
 struct Pro2Virtual { IOHIDUserDeviceRef device; };
@@ -27,6 +28,8 @@ Pro2VirtualRef pro2_virtual_create(void) {
     Pro2VirtualRef result = calloc(1,sizeof(*result));
     if (!result) { CFRelease(device); return NULL; }
     result->device = device;
+    IOHIDUserDeviceSetDispatchQueue(device, dispatch_get_main_queue());
+    IOHIDUserDeviceActivate(device);
     return result;
 }
 int32_t pro2_virtual_send(Pro2VirtualRef device, const uint8_t *bytes, size_t length) {
@@ -34,5 +37,5 @@ int32_t pro2_virtual_send(Pro2VirtualRef device, const uint8_t *bytes, size_t le
     return IOHIDUserDeviceHandleReportWithTimeStamp(device->device,mach_absolute_time(),bytes,(CFIndex)length);
 }
 void pro2_virtual_destroy(Pro2VirtualRef device) {
-    if (device) { CFRelease(device->device); free(device); }
+    if (device) { IOHIDUserDeviceCancel(device->device); CFRelease(device->device); free(device); }
 }

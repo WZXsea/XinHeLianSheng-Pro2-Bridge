@@ -113,7 +113,9 @@ final class Pro2CoreTests: XCTestCase {
         let raw = Pro2RumbleEncoder.neutralRaw02()
         let packet = try Pro2RumbleEncoder.ble(raw02: raw, packetID: 0xff)
         let zero: [UInt8] = [0xe1,0,0x10,0x1e,0]
-        XCTAssertEqual(packet.bytes, [0] + [0x5f] + zero + zero + zero + [0x5f] + zero + zero + zero)
+        var expected: [UInt8] = [0]
+        for _ in 0..<2 { expected.append(0x5f); for _ in 0..<3 { expected.append(contentsOf:zero) } }
+        XCTAssertEqual(packet.bytes, expected)
         XCTAssertFalse(packet.active)
         let usb = try Pro2RumbleEncoder.usb(raw02: raw, packetID: 0xff)
         XCTAssertEqual(usb.bytes.count, 64)
