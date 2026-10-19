@@ -121,7 +121,7 @@ public sealed class MacBackendInstaller {
   while(true){
    token.ThrowIfCancellationRequested();
    try{return new FileStream(path,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None,1,FileOptions.None);}
-   catch(IOException error)when((error.HResult&0xffff)is 11 or 32 or 33){await Task.Delay(80,token).ConfigureAwait(false);}
+   catch(IOException error)when((error.HResult&0xffff)is 11 or 32 or 33 or 35){await Task.Delay(80,token).ConfigureAwait(false);}
   }
  }
  static bool IsOfficialReleaseLocation(Uri address)=>address.Scheme==Uri.UriSchemeHttps&&
