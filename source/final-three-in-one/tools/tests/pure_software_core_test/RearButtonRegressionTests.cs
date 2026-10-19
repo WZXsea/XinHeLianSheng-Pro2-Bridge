@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO;
@@ -96,7 +97,7 @@ internal static class RearButtonRegressionTests
 
     private static void Timed()
     {
-        foreach (var action in Enum.GetValues<RearButtonAction>())
+        foreach (var action in Enum.GetValues<RearButtonAction>().Where(a => a != RearButtonAction.Disabled))
         {
             var config = Config(new() { Enabled = true, Action = action, Buttons = GamepadButtons.South,
                 DelayMs = 30, PressMs = 30, GapMs = 30, RepeatCount = 2,

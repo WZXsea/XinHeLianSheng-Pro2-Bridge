@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 
 namespace Y700Switch2V60Viiper;
@@ -33,7 +34,8 @@ public sealed partial class MainViewModel
     private void RefreshLowRateDiagnosis()
     {
         Pro2RateEvidence rate = inputSource.GetRateEvidence();
-        BleLowRateDiagnosis next = BleLowRateDiagnoser.Evaluate(rate, BleCompatibilityInspector.Current, environmentSnapshot);
+        BleLowRateDiagnosis next = inputSource.IsUsb ? BleLowRateDiagnosis.Hidden :
+            BleLowRateDiagnoser.Evaluate(rate, BleCompatibilityInspector.Current, environmentSnapshot);
         string key = next.Visible ? next.Code + ":" + rate.GameplayReady + ":" + rate.IntervalUnits : "none";
         lowRateEvidenceSnapshot = rate;
         lowRateDiagnosis = next;

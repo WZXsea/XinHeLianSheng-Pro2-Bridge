@@ -1,6 +1,6 @@
 # PRO2 手柄助手 · 源码
 
-当前纯软件版：**v1.3.22**。主要程序位于 `windows/v60_viiper_app`，离线回归位于 `tools/tests/pure_software_core_test`；Pro1 虚拟设备后端位于 `tools/viiper/haptic-src/device/nspro`。
+当前增强版：**1.3.22-local-rumble-preview**，基于上游 v1.3.22 修改，新增 USB 输入、快速重连、配置中心、3D 按键展示、霓虹主题、电量定期读取和即时试振。详见[增强版修改说明](../../docs/LOCAL_CHANGES.md)。主要程序位于 `windows/v60_viiper_app`，离线回归位于 `tools/tests/pure_software_core_test`；Pro1 虚拟设备后端位于 `tools/viiper/haptic-src/device/nspro`。
 
 本目录保留原有布局，不另建独立架构。ESP、Pico、三合一相关目录仅作历史参考：[旧构建说明](README_THREE_IN_ONE_ARCHIVE.md)。
 

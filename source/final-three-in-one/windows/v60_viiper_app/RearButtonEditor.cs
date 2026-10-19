@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -64,7 +65,7 @@ public sealed class RearStepEditor : RearEditorObservable
 
 public sealed class RearButtonEditor : RearEditorObservable
 {
-    public static IReadOnlyList<string> Actions { get; } = ["按住映射", "单次按键", "按住连发", "顺序按键"];
+    public static IReadOnlyList<string> Actions { get; } = ["按住映射", "单次按键", "按住连发", "顺序按键", "禁用按键"];
     public string Title { get; }
     public bool Ps5 { get; }
     public bool Nintendo { get; }
@@ -80,16 +81,18 @@ public sealed class RearButtonEditor : RearEditorObservable
     {
         get => action;
         set { string next = Actions.Contains(value) ? value : Actions[0]; if (action == next) return; action = next; Changed();
-            Changed(nameof(IsTimed)); Changed(nameof(IsRepeat)); Changed(nameof(IsSequence)); Changed(nameof(BehaviorHint)); }
+            Changed(nameof(IsTimed)); Changed(nameof(IsRepeat)); Changed(nameof(IsSequence)); Changed(nameof(BehaviorHint)); Changed(nameof(HasOutput)); }
     }
-    public bool IsTimed => Action != Actions[0];
+    public bool IsTimed => Action != Actions[0] && Action != Actions[4];
     public bool IsRepeat => Action == Actions[2];
     public bool IsSequence => Action == Actions[3];
+    public bool HasOutput => Action != Actions[4];
     public string BehaviorHint => Action switch
     {
         "按住连发" => "仅按住时连发；松开停止，0 表示不限次数。",
         "单次按键" => "触发一次；执行中重复按下不排队。",
         "顺序按键" => "触发一次顺序动作；执行中不叠加，可随时停止背键。",
+        "禁用按键" => "拦截此实体按键，不产生游戏输入。",
         _ => "按住生效，松开停止。"
     };
     private string delay = "0", duration = "80", gap = "80", count = "0";
@@ -130,13 +133,14 @@ public sealed class RearButtonEditor : RearEditorObservable
         binding = new(); error = "";
         var keys = Buttons.Where(c => c.Selected).Aggregate(GamepadButtons.None, (mask, c) => mask | c.Key);
         int actionIndex = Actions.ToList().IndexOf(Action);
-        if (Enabled && keys == GamepadButtons.None) { error = Title + "：请选择至少一个按键。"; return false; }
+        if (actionIndex == 4) keys = GamepadButtons.None;
+        if (Enabled && actionIndex != 4 && keys == GamepadButtons.None) { error = Title + "：请选择至少一个按键。"; return false; }
         if (Enabled && RearButtonBinding.HasOppositeDirections(keys)) { error = Title + "：相反方向不能同时选择。"; return false; }
         bool delayOk = Number(Delay, 0, 30000, out int delay);
         bool durationOk = Number(Duration, 30, 30000, out int duration);
         bool gapOk = Number(Gap, 30, 30000, out int gap);
         bool countOk = Number(Count, 0, 1000, out int count);
-        if (Enabled && (!delayOk || (IsTimed && !durationOk) || (IsRepeat && (!gapOk || !countOk))))
+        if (Enabled && actionIndex != 4 && (!delayOk || (IsTimed && !durationOk) || (IsRepeat && (!gapOk || !countOk))))
         { error = Title + "：延迟0–30000ms，按下/间隔30–30000ms，次数0–1000。"; return false; }
         // Hidden or disabled fields cannot prevent disabling a mapping. Invalid
         // unused drafts are stored as safe defaults, never passed to the runtime.

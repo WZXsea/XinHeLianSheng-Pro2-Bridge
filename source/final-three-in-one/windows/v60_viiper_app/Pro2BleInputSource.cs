@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -106,7 +107,7 @@ public sealed partial class Pro2BleInputSource :
             liveParsedRateHz = parsedHz;
             liveFd2RateHz = rawHz;
             liveRateMeasuredTicks = now;
-            windowMessage = "[PRO2_BLE_RATE_WINDOW] seconds=" + seconds.ToString("F2") +
+            windowMessage = (IsUsb ? "[PRO2_USB_RATE_WINDOW] seconds=" : "[PRO2_BLE_RATE_WINDOW] seconds=") + seconds.ToString("F2") +
                 " fd2_hz=" + rawHz.ToString("F2") + " parsed_hz=" + parsedHz.ToString("F2") +
                 " " + liveNotifyGaps.SummarizeAndReset(out lastLiveGapSummary);
             rateStability.ObserveWindow(new(liveRateProbeTicks, now,
@@ -126,7 +127,7 @@ public sealed partial class Pro2BleInputSource :
                 rateAccepted = true;
                 lastPerformanceWarning = "";
                 lastPerformanceFailure = "";
-                linkRateClass = "133hz";
+                linkRateClass = IsUsb ? parsedHz.ToString("F0") + "hz" : "133hz";
             }
             else
             {
@@ -137,7 +138,7 @@ public sealed partial class Pro2BleInputSource :
             }
         }
         connectionProgress?.Report(windowMessage);
-        connectionProgress?.Report(protocolAudit.Summary(Stopwatch.GetTimestamp()));
+        if (!IsUsb) connectionProgress?.Report(protocolAudit.Summary(Stopwatch.GetTimestamp()));
         if (downgraded) SetConnectionPhase(Pro2ConnectionPhase.RateLimited);
         if (recovered)
         {
@@ -337,6 +338,7 @@ public sealed partial class Pro2BleInputSource :
 
     public Pro2BleInputSource()
     {
+        rumblePreview=new RumblePreviewMixer(()=>IsOutputReady,(byte[] packet,out string error)=>TryWriteOutputReportCore(packet,out error));
         inputStability = new Pro2InputStabilityFilter(inputStabilityOptions);
         spikeRecorder = new Pro2Fd2SpikeRecorder(inputStabilityOptions);
         researchRecorder = new Pro2Fd2ResearchRecorder();
@@ -345,7 +347,7 @@ public sealed partial class Pro2BleInputSource :
     public event Action<Pro2BleDisconnectSignal>? DisconnectDetected;
 
     public bool IsRunning { get; private set; }
-    public bool IsOutputReady =>
+    public bool IsOutputReady => IsUsb ? IsRunning && usbWriteTask is { IsCompleted: false } :
         IsRunning &&
         rumbleCharacteristic != null &&
         rumbleWriterTask is { IsCompleted: false };
@@ -366,7 +368,7 @@ public sealed partial class Pro2BleInputSource :
             {
                 if (IsRunning && latestAt != default && updates > 0)
                 {
-                    return "真实 Pro2 BLE live，updates=" + updates +
+                    return "真实 Pro2 " + TransportLabel + " live，updates=" + updates +
                            " source=" + lastParseSource +
                            " raw_notify=" + rawNotifyCount + " " +
                            BuildMetricsSummaryNoLock();
@@ -613,16 +615,20 @@ public sealed partial class Pro2BleInputSource :
                 Stopwatch.GetElapsedTime(batteryStatusTicks).TotalSeconds <= 95;
             var state = latest.Clone();
             bool hasConnectionLevel = IsRunning && batteryStatus.HasValue && batteryStatus.Value.HasLevel;
-            bool runtimeLevel = hasConnectionLevel && batteryLevelSource == "runtime_notify";
+            bool runtimeLevel = hasConnectionLevel && batteryLevelSource is "runtime_notify" or "usb_runtime";
             double age = batteryStatusTicks == 0 ? double.PositiveInfinity :
                 Stopwatch.GetElapsedTime(batteryStatusTicks).TotalSeconds;
-            bool levelFresh = Pro2RuntimeBatteryPolicy.IsFreshRuntimeLevel(runtimeLevel, age);
+            bool levelFresh = batteryLevelSource=="usb_runtime"
+                ? runtimeLevel && age>=0 && age<=Pro2UsbBatteryPolicy.LevelFreshSeconds
+                : Pro2RuntimeBatteryPolicy.IsFreshRuntimeLevel(runtimeLevel, age);
             if (hasConnectionLevel) batteryStatus!.Value.ApplyTo(state);
             bool chargeFresh = IsRunning && chargeStatusTicks != 0 &&
                 Stopwatch.GetElapsedTime(chargeStatusTicks).TotalSeconds <= 95;
             if (chargeFresh) chargeStatus!.Value.ApplyTo(state);
             else if (!fresh) state.BatteryPowerKnown = false;
             return (state, fresh || chargeFresh,
+                IsUsb ? runtimeLevel ? "usb_periodic_primary_report+passive_usb05_voltage_and_charge" :
+                    "usb_initial_primary_report+passive_usb05_voltage_and_charge" :
                 runtimeLevel ? "runtime_primary_notify+passive_fd2_voltage_and_charge" :
                 initialBatterySnapshotTest ? "initial_only_snapshot+passive_fd2_voltage_and_charge" :
                     "connection_read+passive_fd2_voltage_and_charge",
@@ -774,6 +780,16 @@ public sealed partial class Pro2BleInputSource :
         }
 
         await StopAsync();
+        if (manualCandidate == null && RequestedTransport != Pro2InputTransport.Bluetooth)
+        {
+            if (await TryStartUsbAsync(progress, excludedAddresses, cancellationToken)) return;
+            if (RequestedTransport == Pro2InputTransport.Usb)
+            {
+                Status = "等待 USB 手柄。请使用数据线连接 NS2 Pro；不会切换到蓝牙。";
+                progress.Report("[PRO2_USB] no available physical NS2 Pro; waiting for cable.");
+                return;
+            }
+        }
         win11BeforeParameters = null;
         win11AfterCustomParameters = null;
         win11ParameterRouteStatus = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)
@@ -808,7 +824,8 @@ public sealed partial class Pro2BleInputSource :
             progress.Report("[BLE_MANUAL] selected=" + manualCandidate.AddressDetail +
                 " score=" + manualCandidate.Score + " exclusive=true exact_uuid_gate=true");
         }
-        else candidates = await ScanCandidatesAsync(progress, scanDuration, cancellationToken);
+        else candidates = await ScanCandidatesAsync(progress, scanDuration, cancellationToken,
+            AutoOptimizeBleEnabled ? preferred : null, excludedAddresses);
         if (customConnectionParameterExperiment && candidates.Count == 0)
         {
             foreach (string address in preferred)
@@ -881,7 +898,7 @@ public sealed partial class Pro2BleInputSource :
                                     ? "saved_profile"
                                     : "fixed_1600_fallback") +
                                 " " + calibrationSummary);
-                if (await ConnectCandidateAsync(candidate, progress, cancellationToken))
+                if (await ConnectCandidateAsync(candidate, progress, cancellationToken, preferred.Contains(candidateAddress)))
                 {
                     connectedLabel = DescribeCandidate(candidate);
                     lock (gate)
@@ -1026,8 +1043,14 @@ public sealed partial class Pro2BleInputSource :
         }
     }
 
-    public bool TryWriteOutputReport(ReadOnlySpan<byte> report, out string error)
+    private readonly RumblePreviewMixer rumblePreview;
+    public bool PreviewRumble(int durationMs,out string error)=>rumblePreview.Request(durationMs,out error);
+    public void FinishRumblePreviewGesture()=>rumblePreview.FinishGesture();
+    public Task StopRumblePreviewAsync()=>rumblePreview.StopAsync();
+    public bool TryWriteOutputReport(ReadOnlySpan<byte> report,out string error)=>rumblePreview.WriteGame(report,out error);
+    private bool TryWriteOutputReportCore(ReadOnlySpan<byte> report, out string error)
     {
+        if (IsUsb) return TryQueueUsbOutput(report, out error);
         error = "";
         if (!IsOutputReady || rumbleCharacteristic == null)
         {
@@ -1120,9 +1143,10 @@ public sealed partial class Pro2BleInputSource :
     private async Task<bool> ConnectCandidateAsync(
         BleCandidate candidate,
         IProgress<string> progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool previouslyConnected = false)
     {
         ResetLiveState();
+        reconnectKnownController = previouslyConnected;
         BeginProtocolAudit(progress);
         SetConnectionPhase(Pro2ConnectionPhase.Connecting);
         BluetoothLEDevice? opened = candidate.IsManualSelection
@@ -1318,6 +1342,7 @@ public sealed partial class Pro2BleInputSource :
             SetConnectionPhase(rateAccepted ? Pro2ConnectionPhase.Ready : Pro2ConnectionPhase.RateLimited);
             StartRumbleWriter(progress);
             StartRuntimeBatteryRefresh(progress);
+            StartFastReconnectBackground(progress);
             LogBatteryTransport(progress);
             progress.Report("[PRO2_BLE_REPORT_RATE] requested_hz=" + RequestedFd2ReportRateHz +
                             " negotiation=" + fd2ReportRateStatus +
@@ -1792,7 +1817,7 @@ public sealed partial class Pro2BleInputSource :
     private async Task<List<BleCandidate>> ScanCandidatesAsync(
         IProgress<string> progress,
         TimeSpan duration,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IReadOnlySet<string>? preferred = null, IReadOnlySet<string>? excluded = null)
     {
         await ReportBluetoothAdapterDiagnosticsAsync(progress);
         List<BleCandidate> active = await ScanCandidatesCoreAsync(
@@ -1800,7 +1825,7 @@ public sealed partial class Pro2BleInputSource :
             duration,
             BluetoothLEScanningMode.Active,
             "active",
-            cancellationToken);
+            cancellationToken, preferred: preferred, excluded: excluded);
         if (active.Count > 0 || cancellationToken.IsCancellationRequested)
         {
             return active;
@@ -1813,7 +1838,7 @@ public sealed partial class Pro2BleInputSource :
             passiveDuration,
             BluetoothLEScanningMode.Passive,
             "passive",
-            cancellationToken);
+            cancellationToken, preferred: preferred, excluded: excluded);
     }
 
     private async Task<List<BleCandidate>> ScanCandidatesCoreAsync(
@@ -1823,7 +1848,8 @@ public sealed partial class Pro2BleInputSource :
         string scanLabel,
         CancellationToken cancellationToken,
         bool includeUnmatched = false,
-        IProgress<Pro2ManualCandidate>? manualProgress = null)
+        IProgress<Pro2ManualCandidate>? manualProgress = null,
+        IReadOnlySet<string>? preferred = null, IReadOnlySet<string>? excluded = null)
     {
         Dictionary<(ulong Address, BluetoothAddressType Type), BleCandidate> found = new();
         HashSet<ulong> seenAdvertisements = [];
@@ -1899,6 +1925,8 @@ public sealed partial class Pro2BleInputSource :
                     progress.Report("[PRO2_BLE] candidate " + DescribeCandidate(candidate));
                     manualProgress?.Report(ToManualCandidate(candidate));
                 }
+                if (BleFastReconnectPolicy.EndScanEarly(FormatAddress(candidate.Address), preferred, excluded) && scanDone.TrySetResult())
+                    progress.Report("[BLE_FAST_RECONNECT] known_advertisement=true scan_wait_remaining_skipped=true");
             }
         };
         localWatcher.Stopped += (_, args) =>
@@ -1925,6 +1953,7 @@ public sealed partial class Pro2BleInputSource :
         try
         {
             await Task.WhenAny(Task.Delay(duration, cancellationToken), scanDone.Task);
+            cancellationToken.ThrowIfCancellationRequested();
         }
         finally
         {
@@ -2397,6 +2426,12 @@ public sealed partial class Pro2BleInputSource :
             catch { callbackAgeMs = double.NaN; }
             protocolAudit.RecordFd2(data, nowTicks, callbackAgeMs);
         }
+        ProcessInputPayload(data, isFd2, isPrimary, sender.Uuid, sender.AttributeHandle, nowTicks, now);
+    }
+
+    private void ProcessInputPayload(byte[] data, bool isFd2, bool isPrimary, Guid sourceUuid,
+        ushort sourceHandle, long nowTicks, DateTimeOffset now)
+    {
         string reportType = isFd2
             ? "fd2"
             : isPrimary
@@ -2469,7 +2504,7 @@ public sealed partial class Pro2BleInputSource :
             if (lastNotifySummaryTicks == 0 ||
                 nowTicks - lastNotifySummaryTicks >= Stopwatch.Frequency)
             {
-                lastNotifySummary = sender.Uuid + " len=" + data.Length +
+                lastNotifySummary = sourceUuid + " len=" + data.Length +
                                     " head=" + ShortHex(data, 24);
                 lastNotifySummaryTicks = nowTicks;
             }
@@ -2480,8 +2515,8 @@ public sealed partial class Pro2BleInputSource :
         if (logFirstPrimary)
         {
             connectionProgress?.Report(
-                "[PRO2_PRIMARY_INPUT] first handle=0x" + sender.AttributeHandle.ToString("X4") +
-                " uuid=" + sender.Uuid +
+                "[PRO2_PRIMARY_INPUT] first handle=0x" + sourceHandle.ToString("X4") +
+                " uuid=" + sourceUuid +
                 " len=" + data.Length +
                 " raw_hex=" + Convert.ToHexString(data));
         }
@@ -2572,7 +2607,8 @@ public sealed partial class Pro2BleInputSource :
             }
             if (batteryStatus.HasValue && batteryStatusTicks != 0 &&
                 Stopwatch.GetElapsedTime(batteryStatusTicks, nowTicks).TotalSeconds <=
-                    (batteryLevelSource == "runtime_notify" ? Pro2RuntimeBatteryPolicy.LevelFreshSeconds : 95))
+                    (batteryLevelSource=="usb_runtime" ? Pro2UsbBatteryPolicy.LevelFreshSeconds :
+                     batteryLevelSource == "runtime_notify" ? Pro2RuntimeBatteryPolicy.LevelFreshSeconds : 95))
                 batteryStatus.Value.ApplyTo(state);
             if (chargeStatus.HasValue && chargeStatusTicks != 0 &&
                 Stopwatch.GetElapsedTime(chargeStatusTicks, nowTicks).TotalSeconds <= 95)
@@ -2636,6 +2672,7 @@ public sealed partial class Pro2BleInputSource :
             rawStateAt = now;
             filteredStateAt = now;
             latest = stableState;
+            if (controllerTestActive) controllerTestSeen |= stableState.Buttons;
             latestAt = DateTimeOffset.UtcNow;
             if (IsRunning)
             {
@@ -3599,9 +3636,13 @@ public sealed partial class Pro2BleInputSource :
 
     private async Task CloseCurrentAsync(string nextStatus)
     {
-        AuditSessionEnd("receiver_release:" + nextStatus);
+        await rumblePreview.StopAsync(resumeGame:false).ConfigureAwait(false);
+        bool closingUsb = IsUsb;
+        await StopUsbAsync();
+        if (!closingUsb) AuditSessionEnd("receiver_release:" + nextStatus);
         lock (gate) activeBleDiagnosticCapture?.MarkInterrupted("receiver_stopped");
         try { compatibilityTrialCts?.Cancel(); } catch (ObjectDisposedException) { }
+        await StopFastReconnectBackgroundAsync();
         IsRunning = false;
         transportConnected = false;
         rateAccepted = false;
@@ -3838,7 +3879,7 @@ public sealed partial class Pro2BleInputSource :
             : 800.0 / connectionIntervalUnits;
         int rawFilteredMaxDelta = MaxAxisDelta(rawState, filteredState);
         int filteredLatestMaxDelta = MaxAxisDelta(filteredState, latest);
-        return "rate_scope=connection_average fd2_live_parsed_hz=" + CurrentParsedRateHz.ToString("F1") +
+        return "transport=" + (IsUsb ? "usb" : "ble") + " rate_scope=connection_average fd2_live_parsed_hz=" + CurrentParsedRateHz.ToString("F1") +
                " ble_raw_hz=" + SampleRate(rawNotifyCount, firstRawNotifyTicks, lastRawNotifyTicks).ToString("F1") +
                " ble_parsed_hz=" + SampleRate(updates, firstParsedNotifyTicks, lastParsedNotifyTicks).ToString("F1") +
                " primary_input_hz=" + SampleRate(primaryInputNotifyCount, firstPrimaryInputTicks, lastPrimaryInputTicks).ToString("F1") +

@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -139,8 +140,8 @@ public sealed class Pro2ControllerSlot : INotifyPropertyChanged
     public string Headline =>
         Name +
         (Enabled ? " · ON" : " · OFF") +
-        (VirtualDeviceRunning ? " · USB" : "") +
-        (InputSource.IsRunning ? " · BLE " + InputSource.LinkRateClass : "") +
+        (VirtualDeviceRunning ? " · 虚拟输出" : "") +
+        (InputSource.IsRunning ? " · " + InputSource.TransportLabel + " " + InputSource.LinkRateClass : "") +
         (AutoReconnectEnabled ? " · AUTO" : "") +
         (string.IsNullOrWhiteSpace(ConnectedAddress) ? "" : " · " + ConnectedAddress);
 

@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -23,6 +24,7 @@ public sealed class ViiperBridgeSession : IAsyncDisposable
     private readonly IGamepadOutputSink? outputSink;
     private readonly RearButtonMapper rearButtonMapper = new();
     private RearButtonConfiguration rearButtonConfiguration = new();
+    private FaceButtonMapping faceButtonMapping = new();
     private int rearCancelRequested;
     private readonly IProgress<ProfessionalImuUiSnapshot>? professionalImuUiProgress;
     private readonly CancellationTokenSource cts = new();
@@ -66,7 +68,8 @@ public sealed class ViiperBridgeSession : IAsyncDisposable
         ProfessionalImuOptions? professionalImuOptions = null,
         ProfessionalHidAuditController? professionalHidAuditController = null,
         IProgress<ProfessionalImuUiSnapshot>? professionalImuUiProgress = null,
-        RearButtonConfiguration? rearButtons = null)
+        RearButtonConfiguration? rearButtons = null,
+        FaceButtonMapping? faceButtonMapping = null)
     {
         this.client = client;
         this.profile = profile;
@@ -82,6 +85,13 @@ public sealed class ViiperBridgeSession : IAsyncDisposable
         this.professionalHidAuditController = professionalHidAuditController ?? new ProfessionalHidAuditController();
         this.professionalImuUiProgress = professionalImuUiProgress;
         rearButtonConfiguration = (rearButtons ?? new()).Normalize();
+        this.faceButtonMapping = faceButtonMapping ?? new();
+    }
+
+    public void SetFaceButtonMapping(FaceButtonMapping mapping)
+    {
+        var previous = Interlocked.Exchange(ref faceButtonMapping, mapping);
+        if (previous != mapping) CancelRearButtons();
     }
 
     public void SetRearButtons(RearButtonConfiguration configuration)
@@ -609,6 +619,7 @@ public sealed class ViiperBridgeSession : IAsyncDisposable
                     ref lastMotionUpdate,
                     ref filteredMotionState);
                 GamepadState physicalControls = continuous;
+                continuous = Volatile.Read(ref faceButtonMapping).Apply(continuous, profile.Mode);
                 if (inputSource?.IsRunning == true && age <= TimeSpan.FromMilliseconds(100))
                     continuous = rearButtonMapper.Apply(continuous, profile.Mode,
                         Volatile.Read(ref rearButtonConfiguration), loopTicks);

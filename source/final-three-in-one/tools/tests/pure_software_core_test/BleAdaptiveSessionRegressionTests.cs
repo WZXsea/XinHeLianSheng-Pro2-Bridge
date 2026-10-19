@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -153,6 +154,43 @@ internal static class BleAdaptiveSessionRegressionTests
             partial.ActivePreset == BleAdaptivePreset.Win11Fixed7p5 &&
             partialResult.Trials.Skip(1).All(t => t.Decision == "measured_rate_regressed"),
             "each later 20Hz regression restores retained best 66Hz rather than baseline or last request");
+
+        // Physical 10-second windows recorded on Windows 11 / Realtek. The old
+        // absolute 2Hz final check discarded both ~120Hz winners for ~15Hz native.
+        BleAdaptiveMeasurement Recorded(double seconds, int count, double p95, double maximum, ushort interval) =>
+            new(new(seconds, count, count, 3, true, true, p95, interval), 0, maximum);
+        foreach (var recorded in new[]
+        {
+            new[]
+            {
+                Recorded(10.0143911, 155, 119.968385, 120.1631, 48),
+                Recorded(10.0074588, 1215, 15.038225, 30.1014, 6),
+                Recorded(10.0116641, 626, 29.98506, 45.2027, 12),
+                Recorded(10.0127422, 611, 30.011295, 60.0791, 12),
+                Recorded(10.0044581, 632, 29.803, 45.2041, 12),
+                Recorded(10.0107479, 1190, 15.0499, 28.899, 6)
+            },
+            new[]
+            {
+                Recorded(10.0058874, 151, 119.97299, 239.9429, 48),
+                Recorded(10.0070454, 1199, 15.03785, 30.0546, 6),
+                Recorded(10.0074085, 620, 29.96986, 45.0406, 12),
+                Recorded(10.0012132, 610, 29.98034, 60.0983, 12),
+                Recorded(10.0033883, 589, 30.024215, 75.0709, 12),
+                Recorded(10.0089503, 1166, 15.03794, 29.9506, 6)
+            }
+        })
+        {
+            var replay = new MockBackend(recorded);
+            var replayResult = await Run(replay);
+            check(replayResult.Selected?.Preset == BleAdaptivePreset.Win11Fixed7p5 &&
+                replay.ActivePreset == BleAdaptivePreset.Win11Fixed7p5 && replayResult.FinalVerified &&
+                replayResult.Code == "final_playable_verified" && replayResult.Final == recorded[^1],
+                "recorded ~120Hz physical input remains selected after ordinary final-window fluctuation");
+            check(replay.MeasurePhases.Last() == "FINAL" && !replay.Requests.Contains(null) &&
+                !BleAdaptivePresetPolicy.MeetsTarget(replayResult.Final),
+                "recorded playable winner is neither released to 60ms native nor mislabeled as 133Hz");
+        }
 
         var finalRegression = new MockBackend(native20, native66, native20, native20, native20, native20, native20);
         var finalRegressionResult = await Run(finalRegression);

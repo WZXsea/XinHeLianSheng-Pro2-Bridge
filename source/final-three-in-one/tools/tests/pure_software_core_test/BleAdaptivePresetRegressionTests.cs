@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Linq;
 using Y700Switch2V60Viiper;
@@ -134,6 +135,23 @@ internal static class BleAdaptivePresetRegressionTests
         check(BleAdaptivePresetPolicy.VerifyFinal(native, Sample(660)).Code == "final_playable_verified" &&
             BleAdaptivePresetPolicy.VerifyFinal(Sample(200, 50, 100), Sample(200, 50, 100)).Code == "final_low_rate_verified",
             "final fallback distinguishes playable and still-low actual results");
+
+        check(BleAdaptivePresetPolicy.VerifyFinal(Sample(1200), Sample(1170)).Code == "final_playable_verified",
+            "same-preset final verification tolerates ordinary relative rate noise above two Hz");
+        check(BleAdaptivePresetPolicy.VerifyFinal(Sample(1200), Sample(1140)).Retain &&
+            !BleAdaptivePresetPolicy.VerifyFinal(Sample(1200), Sample(1139)).Retain,
+            "same-preset final rate tolerance has an inclusive five-percent boundary");
+        check(!BleAdaptivePresetPolicy.VerifyFinal(Sample(610), Sample(599)).Retain,
+            "verification noise allowance must not turn a drop below 60Hz into a retained playable preset");
+        check(!BleAdaptivePresetPolicy.VerifyFinal(Sample(1200), Sample(1170, 30, 100)).Retain,
+            "relative rate noise allowance does not hide worsening notification gaps");
+        check(!BleAdaptivePresetPolicy.VerifyFinal(Sample(1200), Sample(1170) with
+            { Sample = Sample(1170).Sample with { ParsedCount = 1100 } }).Retain &&
+            !BleAdaptivePresetPolicy.VerifyFinal(Sample(1200), Sample(1170) with
+            { Sample = Sample(1170).Sample with { LastInputAgeMs = 500 } }).Retain,
+            "same-preset rate tolerance still requires complete parsing and fresh physical input");
+        check(!BleAdaptivePresetPolicy.EvaluateCandidate(Sample(200, 50, 100), Sample(1200), Sample(1170)).Retain,
+            "verification tolerance does not let a worse different preset replace the measured best");
 
         var now = new DateTimeOffset(2026, 10, 10, 12, 0, 0, TimeSpan.Zero);
         var key = new BleAdaptiveEnvironmentKey(26200, new string('A', 64), "USB\\VID_8087&PID_0026", "one-radio-8087-0026",

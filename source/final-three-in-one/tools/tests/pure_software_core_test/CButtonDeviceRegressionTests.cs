@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Text.Json;
@@ -33,7 +34,7 @@ internal static class CButtonDeviceRegressionTests
                     "C preserves real input identity");
                 check(engine.Apply(State(), mode, config, Tick(15)).Buttons == 0, "C hold releases " + mode);
             }
-            foreach (var action in Enum.GetValues<RearButtonAction>())
+            foreach (var action in Enum.GetValues<RearButtonAction>().Where(a => a != RearButtonAction.Disabled))
             {
                 var binding = new RearButtonBinding { Enabled = true, Action = action, Buttons = GamepadButtons.South | GamepadButtons.L2,
                     DelayMs = 30, PressMs = 30, GapMs = 30, RepeatCount = 2,

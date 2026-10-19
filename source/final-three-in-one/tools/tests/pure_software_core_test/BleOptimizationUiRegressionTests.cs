@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Linq;
 using System.Text.Json;
@@ -54,14 +55,14 @@ internal static class BleOptimizationUiRegressionTests
         var hint = (TextBlock)window.FindName("BleConnectionHintText");
         var summary = (TextBlock)window.FindName("BleOptimizationSummaryText");
         check(title.GetBindingExpression(TextBlock.TextProperty)?.ParentBinding.Path.Path == nameof(MainViewModel.BleConnectionTitle) &&
-            hint.GetBindingExpression(TextBlock.TextProperty)?.ParentBinding.Path.Path == nameof(MainViewModel.BleConnectionHint) &&
+            hint.GetBindingExpression(TextBlock.TextProperty)?.ParentBinding.Path.Path == nameof(MainViewModel.HomeConnectionHint) &&
             summary.GetBindingExpression(TextBlock.TextProperty)?.ParentBinding.Path.Path == nameof(MainViewModel.BleOptimizationSummary),
             "home optimization progress binds source-backed connection text and measured summary");
         var button = (Button)window.FindName("BleAutoOptimizeButton");
         check(button.Content?.ToString() == "自动优化蓝牙…" &&
             button.GetBindingExpression(Button.IsEnabledProperty)?.ParentBinding.Path.Path == nameof(MainViewModel.CanTryWin11Compatibility),
             "home exposes bounded automatic optimizer instead of opaque single 7.5ms action");
-        check(!vm.IsBleOptimizationRunning && title.Text == vm.CompactConnectionTitle && hint.Text == vm.CompactConnectionHint,
+        check(!vm.IsBleOptimizationRunning && title.Text == vm.CompactConnectionTitle && hint.Text == vm.HomeConnectionHint,
             "offline home keeps existing connection message until a real optimizer is running");
     }
 }

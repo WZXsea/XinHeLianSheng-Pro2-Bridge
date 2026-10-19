@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -73,7 +74,7 @@ public static class BleAdaptiveDiagnostics
         if (!string.IsNullOrWhiteSpace(snapshot.Stage)) text.AppendLine("最近阶段：" + Clean(snapshot.Stage));
         if (snapshot.CapturedAt.HasValue)
             text.AppendLine("记录时间：" + snapshot.CapturedAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture));
-        text.AppendLine("请求被接受不等于采用了该间隔；133Hz 以真实 FD2 / Parsed 完整窗口及复核为准。");
+        text.AppendLine("请求被接受不等于采用了该间隔；完整稳定性复核与快速重连短窗口确认分别记录。");
         if (snapshot.State == "not_recorded")
         {
             text.AppendLine("本会话没有预设请求详细记录，可能是旧会话或未开启测试；不能据此认定请求被拒绝。");
@@ -85,7 +86,7 @@ public static class BleAdaptiveDiagnostics
         bool hasFinal = snapshot.Final?.Sample != null;
         text.AppendLine("最终连接：" + Measurement(snapshot.Final));
         text.AppendLine("选用路线：" + (string.IsNullOrWhiteSpace(snapshot.SelectedPreset) ? "原连接／未选中预设" : Clean(snapshot.SelectedPreset)) +
-            "；最终复核：" + (hasFinal ? snapshot.FinalVerified ? "通过" : "未通过" : "未进行"));
+            "；最终复核：" + (snapshot.FinalCode == "fast_reconnect_ready" ? "短窗口通过，后台观察中" : hasFinal ? snapshot.FinalVerified ? "通过" : "未通过" : "未进行"));
         if (snapshot.Windows is { Count: > 0 } windows)
         {
             text.AppendLine();
@@ -204,6 +205,9 @@ public static class BleAdaptiveDiagnostics
 
     public static string ExplainCode(string? code) => code switch
     {
+        "fast_reconnect_ready" => "恢复此手柄上次成功参数；2 秒真实输入检查通过，允许游玩，后台观察尚未完成。",
+        "fast_reconnect_background_verified" => "快速重连后，后台 10 秒真实输入观察通过。",
+        "fast_reconnect_background_degraded" => "快速重连后的后台观察发现波动；不在游戏中切换参数，下次连接回退完整测试。",
         "native_measurement_not_ready" => "原连接测量窗口无效，未进行参数预设测试。",
         "native_target_preserved" => "原连接已达高速门槛，未追加参数请求。",
         "win11_api_unavailable" => "当前系统参数请求 API 不可用，未进行预设测试。",

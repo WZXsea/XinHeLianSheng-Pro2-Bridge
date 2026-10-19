@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Buffers.Binary;
 using System.Diagnostics;
@@ -25,6 +26,71 @@ internal static class Program
         Directory.CreateDirectory(output);
         try
         {
+            if(args.Contains("--rumble-preview-only"))
+            {
+                Pro2UsbRegressionTests.Run(Check);
+                RumblePreviewRegressionTests.RunAsync(Check).GetAwaiter().GetResult();
+                Console.WriteLine("PASS rumble preview: "+checks+" assertions; offline only.");
+                return 0;
+            }
+            if(args.Contains("--probe-usb-get-battery"))
+            {
+                UsbBatteryGetReportProbe.RunAsync().GetAwaiter().GetResult();
+                return 0;
+            }
+            if (args.Contains("--usb-battery-only"))
+            {
+                Pro2UsbBatteryRegressionTests.RunAsync(Check).GetAwaiter().GetResult();
+                UsbPeriodicBatteryRegressionTests.RunAsync(Check).GetAwaiter().GetResult();
+                Console.WriteLine("PASS USB battery: "+checks+" assertions; offline only.");
+                return 0;
+            }
+            if (args.Contains("--home-only"))
+            {
+                Environment.SetEnvironmentVariable("V60_UI_SMOKE", "1");
+                var homeApp = new Application { ShutdownMode=ShutdownMode.OnExplicitShutdown };
+                var homeWindow = new MainWindow { ShowActivated=false };
+                homeWindow.Show(); Pump(homeWindow);
+                HomeDashboardRegressionTests.Run(homeWindow, (MainViewModel)homeWindow.DataContext,
+                    Check, () => Pump(homeWindow), name => Save(homeWindow,name));
+                Console.WriteLine("PASS home: "+checks+" assertions; offline only.");
+                homeWindow.Close(); Pump(homeWindow); homeApp.Shutdown();
+                return 0;
+            }
+            if (args.Contains("--motion-only"))
+            {
+                _ = new Application { ShutdownMode=ShutdownMode.OnExplicitShutdown };
+                ControllerButtonMotionRegressionTests.Run(Check,output);
+                Console.WriteLine("PASS button motion: "+checks+" rendered-pixel assertions; offline only.");
+                return 0;
+            }
+            if (args.Contains("--model-preview"))
+            {
+                ControllerModelPreview.Render(output);
+                return 0;
+            }
+            if (args.Contains("--mesh-asset-only"))
+            {
+                ControllerMeshAssetRegressionTests.Run(Check);
+                Console.WriteLine("PASS OBJ import: " + checks + " assertions; no UI or controller access.");
+                return 0;
+            }
+            if (args.Contains("--probe-usb"))
+            {
+                RunUsbProbeAsync().GetAwaiter().GetResult();
+                return 0;
+            }
+            if (args.Contains("--probe-usb-source"))
+            {
+                RunUsbSourceProbeAsync().GetAwaiter().GetResult();
+                return 0;
+            }
+            if (args.Contains("--ui-only"))
+            {
+                TestReleasePackaging(); ControllerMeshAssetRegressionTests.Run(Check); UsbipDiscoveryRegressionTests.Run(Check, output); TestUi();
+                Console.WriteLine("PASS UI: " + checks + " assertions; offline only.");
+                return 0;
+            }
             if (args.Contains("--capture-environment"))
             {
                 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(12));
@@ -48,6 +114,8 @@ internal static class Program
             BleMeasuredTrialRegressionTests.Run(Check);
             BleAdaptivePresetRegressionTests.Run(Check);
             BleAdaptiveSessionRegressionTests.RunAsync(Check, output).GetAwaiter().GetResult();
+            ControllerMeshAssetRegressionTests.Run(Check);
+            BleFastReconnectRegressionTests.RunAsync(Check, output).GetAwaiter().GetResult();
             BleMeasurementWindowRegressionTests.RunAsync(Check).GetAwaiter().GetResult();
             BleAdaptiveDiagnosticsRegressionTests.Run(Check);
             BleAdaptiveDiagnosticStoreRegressionTests.Run(Check, output);
@@ -64,6 +132,13 @@ internal static class Program
             Pro1RegressionTests.Run(Check);
             ManualConnectionRegressionTests.RunAsync(Check).GetAwaiter().GetResult();
             RearButtonRegressionTests.Run(Check, output);
+            FaceButtonMappingRegressionTests.Run(Check);
+            ConfigurationCenterRegressionTests.Run(Check);
+            ControllerTestRegressionTests.Run(Check);
+            Pro2UsbRegressionTests.Run(Check);
+            Pro2UsbBatteryRegressionTests.RunAsync(Check).GetAwaiter().GetResult();
+            UsbPeriodicBatteryRegressionTests.RunAsync(Check).GetAwaiter().GetResult();
+            TransportSwitchRegressionTests.Run(Check);
             RearButtonSafetyRegressionTests.RunAsync(Check).GetAwaiter().GetResult();
             CButtonDeviceRegressionTests.Run(Check);
             TestQueue();
@@ -100,12 +175,61 @@ internal static class Program
         checks++;
     }
 
+    private static async Task RunUsbSourceProbeAsync()
+    {
+        await using var source = new Pro2BleInputSource { RequestedTransport = Pro2InputTransport.Usb };
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        await source.StartAsync(new Progress<string>(Console.WriteLine), timeout.Token);
+        for (int i = 0; i < 8; i++)
+        {
+            await Task.Delay(1000, timeout.Token);
+            source.RecheckLiveRate();
+            var state = source.GetControllerTestSnapshot();
+            Console.WriteLine("USB SOURCE fresh=" + state.Fresh + " rate=" + state.RateText + " gap=" + state.GapText +
+                " age=" + state.AgeText + " buttons=" + state.State.Buttons + " output_ready=" + source.IsOutputReady);
+        }
+        File.WriteAllText(Path.Combine(output, "usb-source-evidence.json"),
+            System.Text.Json.JsonSerializer.Serialize(source.GetRateEvidence(), new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private static async Task RunUsbProbeAsync()
+    {
+        var candidates = Pro2UsbDevice.Enumerate();
+        Console.WriteLine("USB physical NS2 Pro candidates: " + candidates.Count);
+        foreach (var candidate in candidates) Console.WriteLine(candidate);
+        if (candidates.Count != 1) throw new InvalidOperationException("Probe requires exactly one physical NS2 Pro.");
+        await using var usb = Pro2UsbDevice.Open(candidates[0]);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        await Task.Run(() => usb.InitializeAsync(new Progress<string>(Console.WriteLine), timeout.Token));
+        byte[] buffer = new byte[64];
+        int count = 0, valid = 0;
+        long first = 0, last = 0;
+        var timer = Stopwatch.StartNew();
+        try
+        {
+            while (timer.Elapsed.TotalSeconds < 8)
+            {
+                int read = await usb.ReadAsync(buffer, timeout.Token);
+                if (read == 0) break;
+                count++;
+                if (count <= 5) Console.WriteLine("REPORT len=" + read + " hex=" + Convert.ToHexString(buffer.AsSpan(0, read)));
+                if (!Pro2UsbProtocol.IsInputReport(buffer.AsSpan(0, read))) continue;
+                long now = Stopwatch.GetTimestamp();
+                if (valid++ == 0) first = now;
+                last = now;
+            }
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested) { }
+        Console.WriteLine("USB actual: reports=" + count + " valid05=" + valid + " rate=" +
+            (last > first ? (valid - 1) * (double)Stopwatch.Frequency / (last - first) : 0).ToString("F2") + " Hz");
+    }
+
     private static void TestReleasePackaging()
     {
         var assembly = typeof(MainWindow).Assembly;
         Check(assembly.GetName().Version?.ToString() == "1.3.22.0", "BLE compatibility release assembly version");
         Check(assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ==
-            "1.3.22-long-session", "BLE compatibility release metadata");
+            "1.3.22-local-rumble-preview", "USB and BLE release metadata");
         Check(assembly.GetType("Y700Switch2V60Viiper.Pro2LiveBatteryReadPolicy") == null,
             "formal release excludes experimental battery query policy");
         Check(assembly.GetType("Y700Switch2V60Viiper.BleOutputIsolationExperiment") == null,
@@ -403,7 +527,7 @@ internal static class Program
         Check(!Win10BleStackProfile.IsAudited(18362, Win10BleStackProfile.AuditedStackSha256), "old Win10 not silently assumed");
     }
 
- 
+
     private static void TestWin11ValidatedProfile()
     {
         var valid = new BluetoothAdapterDiagnosticInfo("offline", "USB\\VID_8087&PID_0026\\offline", "8087", "0026",
@@ -882,6 +1006,8 @@ internal static class Program
         Pump(window);
         var vm = (MainViewModel)window.DataContext;
         BleOptimizationUiRegressionTests.RunBindings(window, vm, Check);
+        HomeDashboardRegressionTests.Run(window, vm, Check, () => Pump(window), name => Save(window,name));
+        RumblePreviewUiRegressionTests.Run(window,vm,Check,()=>Pump(window),name=>Save(window,name));
         BleGeneralizedUiRegressionTests.RunBindings(window, vm, Check);
         Win10HomeUiRegressionTests.RunBindings(window, vm, Check, () => Pump(window));
         if (vm.ShowWin10BleHomeAction)
@@ -904,6 +1030,19 @@ internal static class Program
             (vm.CompactSystemText.Contains("Windows 10") || vm.CompactSystemText.Contains("Windows 11")), "UI system family/version follows runtime metadata");
         Check(vm.CompactCanConnect && vm.CompactConnectText == "连接 Pro2", "offline connection button remains usable");
         var settingsTabs = Descendants<TabControl>(window).First();
+        settingsTabs.SelectedIndex = 3; Pump(window);
+        var inputTransport = (ComboBox)window.FindName("InputTransportSelector");
+        Check(inputTransport.Items.Count == 3 && vm.SelectedInputTransport == "自动（优先 USB）", "USB/BLE automatic selection exposed in settings");
+        inputTransport.SelectedIndex = 1; Pump(window);
+        Check(vm.Pro2Slots.All(slot => slot.InputSource.RequestedTransport == Pro2InputTransport.Usb) &&
+            vm.SelectedInputTransport == "仅 USB 有线", "USB-only selection configures all physical slots");
+        inputTransport.SelectedIndex = 2; Pump(window);
+        Check(vm.Pro2Slots.All(slot => slot.InputSource.RequestedTransport == Pro2InputTransport.Bluetooth), "Bluetooth-only selection restores BLE discovery");
+        inputTransport.SelectedIndex = 0; Pump(window);
+        TransportSwitchRegressionTests.RunUi(window,vm,Check,()=>Pump(window));
+        vm.SwapABButtons = true; vm.SwapXYButtons = true;
+        Check(vm.FaceButtonMappingSummary.Contains("A → A"), "legacy letter layout remains supported");
+        vm.SwapABButtons = false; vm.SwapXYButtons = false;
         settingsTabs.SelectedIndex = 3; Pump(window);
         BluetoothRestartRegressionTests.RunUi(window, vm, Check, () => Pump(window), (dialog, name) => Save(dialog, name));
         var selectUsbip = (Button)window.FindName("SelectUsbipPathButton");
@@ -1076,8 +1215,22 @@ internal static class Program
             "removed Edge checkbox is absent from UI");
         vm.SelectCompactModeCommand.Execute("Pro2");
         var tabs = (TabControl)window.FindName("MainTabs");
-        Check(tabs.Items.Count == 4 && ((TabItem)tabs.Items[2]).Header.ToString() == "背键 / C 键",
-            "four functional tabs, dedicated rear-button page");
+        Check(tabs.Items.Count == 4 && ((TabItem)tabs.Items[2]).Header.ToString() == "配置中心",
+            "tester, mapping and rear configuration share one center");
+        tabs.SelectedIndex = 2; Pump(window);
+        var tester = (ControllerTestView)window.FindName("ControllerTester");
+        Check(tester.IsSampling && !vm.Running, "configuration center only observes input without connecting");
+        tester.Present(ControllerTestRegressionTests.Fixture());
+        window.UpdateLayout(); Save(window, "ui-tester-active.png");
+        Check(((TextBlock)tester.FindName("TestRate")).Text == "128.0 Hz" &&
+            ((TextBlock)tester.FindName("TestTriggers")).Text.Contains("ZL 按下"), "tester renders physical fixtures");
+        tester.Present(ControllerTestRegressionTests.Fixture(false));
+        Check(((TextBlock)tester.FindName("TestRate")).Text == "—" &&
+            ((TextBlock)tester.FindName("TestStatus")).Text.Contains("停顿"), "tester renders stalled input honestly");
+        tabs.SelectedIndex = 0; Pump(window);
+        Check(!tester.IsSampling, "configuration center polling stops on hidden tab");
+        tabs.SelectedIndex = 2; Pump(window);
+        ConfigurationCenterRegressionTests.RunUi(window, tester, vm, Check, () => Pump(window), name => Save(window, name), output);
         Check(vm.RearEditors.Count == 3 && vm.RearEditors[0].Title.Contains("GL") && vm.RearEditors[2].Title == "C 键", "rear keys and C editable");
         vm.RearEditingMode = "PS5";
         Check(vm.RearEditors[0].Buttons.Any(b => b.Label == "×") &&
@@ -1109,7 +1262,7 @@ internal static class Program
             vm.SelectedRearEditor.Action = "按住连发"; vm.SelectedRearEditor.Delay = "35";
             vm.ApplyRearButtonsCommand.Execute(null);
             Check(vm.RearSettingsStatus == "已保存并应用。", "C draft save without physical controller " + cMode);
-            var cProfile = cMode switch { "PS5" => cPersisted.RearButtons.Ps5, "Pro1" => cPersisted.RearButtons.Pro1, _ => cPersisted.RearButtons.Xbox };
+            var cProfile = cMode switch { "PS5" => cPersisted.RearButtons.Ps5, "Pro1" => cPersisted.RearButtons.Pro1, "Pro2" => cPersisted.RearButtons.Pro2, _ => cPersisted.RearButtons.Xbox };
             Check(cProfile.C.Enabled && cProfile.C.Action == RearButtonAction.Repeat && cProfile.C.DelayMs == 35 && cProfile.C.Buttons == GamepadButtons.R1,
                 "C UI writes real independent mode configuration " + cMode);
         }
@@ -1118,25 +1271,21 @@ internal static class Program
         vm.SelectedRearIndex = 0;
         tabs.SelectedIndex = 2;
         Pump(window);
-        var rearList = (ItemsControl)window.FindName("RearKeyList");
-        Check(vm.SelectedRearIndex == 0 && vm.RearEditors[0].IsSelected && !vm.RearEditors[1].IsSelected,
-            "GL selector visibly selected and matches editor after mode change");
-        var rearSelectors = Descendants<Button>(rearList).ToArray();
-        Check(rearSelectors.Length == 3, "GL/GR/C all rendered as real UI selectors");
-        rearSelectors[2].Command.Execute(rearSelectors[2].CommandParameter); Pump(window);
-        Check(vm.SelectedRearIndex == 2 && vm.SelectedRearEditor.Title == "C 键" && vm.RearEditors[2].IsSelected,
-            "real C selector opens only the C editor");
+        vm.SelectConfigurationKey(GamepadButtons.PaddleLeft); Pump(window);
+        Check(vm.SelectedConfigurationKey.Key == GamepadButtons.PaddleLeft && vm.SelectedRearIndex == 0,
+            "GL selected in unified editor");
+        vm.SelectConfigurationKey(GamepadButtons.Aux); Pump(window);
+        Check(vm.SelectedRearIndex == 2 && vm.IsRearKeySelected, "C opens advanced editor");
         Save(window, "ui-c-selector.png");
-        rearSelectors[1].Command.Execute(rearSelectors[1].CommandParameter); Pump(window);
-        Check(vm.SelectedRearIndex == 1 && vm.SelectedRearEditor.Title.Contains("GR"), "GR selection opens only right rear editor");
+        vm.SelectConfigurationKey(GamepadButtons.PaddleRight);
         vm.RearEditingMode = "PS5"; Pump(window);
-        Check(vm.SelectedRearIndex == 1 && vm.SelectedRearEditor.Ps5 && vm.SelectedRearEditor.IsSelected,
-            "mode switch preserves selected physical rear key");
-        vm.RearEditingMode = "Xbox"; vm.SelectedRearIndex = 0;
-        Pump(window);
-        var rearScroll = (ScrollViewer)window.FindName("RearEditorScroll");
-        var choices = Descendants<CheckBox>(rearScroll).Where(c => c.DataContext is RearButtonChoice).ToArray();
-        Check(choices.Length == 17 && choices.All(c => c.IsEnabled), "all target keys editable offline even when mapping disabled");
+        Check(vm.SelectedRearIndex == 1 && vm.SelectedRearEditor.Ps5, "profile switch preserves rear selection");
+        vm.RearEditingMode = "Xbox"; vm.SelectConfigurationKey(GamepadButtons.PaddleLeft); Pump(window);
+        tester.OpenKeyEditor(GamepadButtons.PaddleLeft);
+        ((Expander)tester.FindName("AdvancedEditor")).IsExpanded = true; Pump(window);
+        var rearContent = (ContentControl)tester.FindName("RearEditorContent");
+        var choices = Descendants<CheckBox>((ItemsControl)tester.FindName("QuickTargetList")).Where(c => c.DataContext is RearButtonChoice).ToArray();
+        Check(choices.Length == 17 && choices.All(c => c.IsEnabled), "all Xbox targets editable offline");
         var aChoice = choices.First(c => ((RearButtonChoice)c.DataContext).Key == GamepadButtons.South);
         aChoice.IsChecked = true; Pump(window);
         Check(vm.SelectedRearEditor.Buttons.First(c => c.Key == GamepadButtons.South).Selected &&
@@ -1160,7 +1309,7 @@ internal static class Program
             RearButtonMapper.ProfilesEquivalent(beforePs5, persisted.RearButtons.Ps5), "invalid unrelated draft cannot block current save or replace another live profile");
         var busyProperty = typeof(MainViewModel).GetProperty(nameof(MainViewModel.Busy))!;
         busyProperty.SetValue(vm, true); Pump(window);
-        var saveButton = Descendants<Button>(window).First(button => ReferenceEquals(button.Command, vm.ApplyRearButtonsCommand));
+        var saveButton = Descendants<Button>(window).First(button => ReferenceEquals(button.Command, vm.SaveConfigurationCommand));
         Check(!saveButton.IsEnabled && !vm.ApplyRearButtonsCommand.CanExecute(null), "save disabled during connection/mode-switch transaction");
         vm.ApplyRearButtonsCommand.Execute(null);
         Check(persisted.RearButtons.Xbox.Left.DelayMs == 25, "busy command invocation cannot overwrite a session's configuration");
@@ -1189,7 +1338,7 @@ internal static class Program
             Save(window, "ui-default-tab-" + tab + ".png");
             var scrolls = Descendants<ScrollViewer>(tabs).Where(s => s.IsVisible).ToArray();
             Check(scrolls.All(s => s.ComputedHorizontalScrollBarVisibility != Visibility.Visible), "no default horizontal scroll " + tab);
-            Check(scrolls.All(s => s.ComputedVerticalScrollBarVisibility != Visibility.Visible), "no default vertical scroll " + tab);
+            Check(tab == 2 || scrolls.All(s => s.ComputedVerticalScrollBarVisibility != Visibility.Visible), "ordinary tabs fit vertically " + tab);
         }
         for (int size = 0; size < 2; size++)
         {
@@ -1206,15 +1355,14 @@ internal static class Program
         }
         tabs.SelectedIndex = 2; vm.RearEditingMode = "PS5"; window.Width = 720; window.Height = 560;
         Pump(window); Save(window, "ui-rear-sequence.png");
-        var selectorScroll = (ScrollViewer)window.FindName("RearSelectorsScroll");
-        Check(selectorScroll.ComputedVerticalScrollBarVisibility == Visibility.Visible,
-            "small window exposes scrolling instead of clipping C selector");
-        selectorScroll.ScrollToEnd(); Pump(window);
-        var cSelector = Descendants<Button>(selectorScroll).Single(b => b.DataContext is RearButtonEditor editor && editor.Title == "C 键");
-        var cBounds = cSelector.TransformToAncestor(selectorScroll).TransformBounds(new Rect(cSelector.RenderSize));
-        Check(cBounds.Top >= 0 && cBounds.Bottom <= selectorScroll.ActualHeight + 1,
-            "C selector reachable at minimum window dimensions");
-        cSelector.Command.Execute(cSelector.CommandParameter); Pump(window); Save(window, "ui-min-c-key.png");
+        var selectorScroll = (ScrollViewer)tester.FindName("CenterScroll");
+        Check(selectorScroll.ComputedHorizontalScrollBarVisibility != Visibility.Visible,
+            "configuration diagram fits minimum width without horizontal scrolling");
+        tester.OpenKeyEditor(GamepadButtons.Aux); ((Expander)tester.FindName("AdvancedEditor")).IsExpanded = true;
+        Pump(window); Save(window, "ui-min-c-key.png");
+        Check(tester.IsKeyEditorOpen && ((ScrollViewer)tester.FindName("PopupScroll")).MaxHeight <= window.ActualHeight - 150,
+            "advanced popup constrains its height at minimum window size");
+        tester.CloseKeyEditor(false);
         Check(vm.SelectedRearIndex == 2 && vm.SelectedRearEditor.Title == "C 键", "C editor works at minimum dimensions");
         TestManualDialogUi(window);
         LongSessionRegressionTests.RunUi(window, vm, Check, () => Pump(window));

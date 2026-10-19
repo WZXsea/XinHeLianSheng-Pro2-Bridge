@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -63,10 +64,15 @@ internal static class LongSessionRegressionTests
             window.WindowState = WindowState.Minimized; window.Hide(); pump();
             check(!timer.IsEnabled, "hidden UI stops presentation timer");
             Model("compactSampleTicks", Stopwatch.GetTimestamp() - 10 * 3600 * Stopwatch.Frequency);
-            window.Show(); pump();
-            window.WindowState = WindowState.Normal; pump();
+            // Fresh fixture at each resume; 3D software screenshot rendering can
+            // legitimately take longer than the source's 500 ms freshness limit.
+            Source("lastParsedNotifyTicks", Stopwatch.GetTimestamp());
+            Source("liveRateMeasuredTicks", Stopwatch.GetTimestamp());
+            window.Show();
+            window.WindowState = WindowState.Normal;
             check(timer.IsEnabled, "show-before-restore restarts timer");
             check(vm.CompactInputRate == "133.0", "resume uses recent rate, not hidden ten-hour average");
+            pump();
         }
         window.Hide(); pump(); window.WindowState = WindowState.Minimized;
         typeof(MainWindow).GetMethod("ShowFromTray", Private)!.Invoke(window, null); pump();

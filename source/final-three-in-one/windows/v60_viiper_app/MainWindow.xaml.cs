@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -19,6 +20,78 @@ public partial class MainWindow : Window
     private bool shutdownInProgress;
     private bool shutdownComplete;
     private bool trayTipShown;
+    private bool homeRevealPlayed;
+    private bool rumbleMouseGesture,rumbleKeyboardGesture;
+    private void RumbleSlider_MouseDown(object sender,System.Windows.Input.MouseButtonEventArgs e)=>rumbleMouseGesture=true;
+    private void RumbleSlider_MouseUp(object sender,System.Windows.Input.MouseButtonEventArgs e)=>FinishRumbleGesture();
+    private void RumbleSlider_LostCapture(object sender,System.Windows.Input.MouseEventArgs e)=>FinishRumbleGesture();
+    private void FinishRumbleGesture()
+    {
+        rumbleMouseGesture=false;
+        if(DataContext is MainViewModel vm)vm.FinishRumblePreviewGesture();
+    }
+    private void RumbleSlider_KeyDown(object sender,System.Windows.Input.KeyEventArgs e)
+    {
+        if(e.Key is not (System.Windows.Input.Key.Left or System.Windows.Input.Key.Right or System.Windows.Input.Key.Up or
+            System.Windows.Input.Key.Down or System.Windows.Input.Key.Home or System.Windows.Input.Key.End or
+            System.Windows.Input.Key.PageUp or System.Windows.Input.Key.PageDown))return;
+        rumbleKeyboardGesture=true;
+        _=Dispatcher.BeginInvoke(DispatcherPriority.Background,new Action(()=>rumbleKeyboardGesture=false));
+    }
+    private void RumbleSlider_ValueChanged(object sender,RoutedPropertyChangedEventArgs<double> e)
+    {
+        if(sender is not System.Windows.Controls.Slider { IsLoaded:true } slider ||
+            !rumbleMouseGesture && !rumbleKeyboardGesture || DataContext is not MainViewModel vm)return;
+        slider.GetBindingExpression(System.Windows.Controls.Slider.ValueProperty)?.UpdateSource();
+        vm.RequestRumblePreview();
+    }
+    private async void RumblePage_Unloaded(object sender,RoutedEventArgs e)
+    {
+        rumbleMouseGesture=false;rumbleKeyboardGesture=false;
+        if(DataContext is MainViewModel vm)await vm.StopRumblePreviewAsync();
+    }
+    private int homeModeIndex = -1;
+    private void OpenConfigurationCenter_Click(object sender,RoutedEventArgs e) => MainTabs.SelectedItem=ControllerTestTab;
+    private void HomeDashboard_SizeChanged(object sender,SizeChangedEventArgs e)
+    {
+        if(HomeModelColumn==null || BleConnectionTitleText==null)return;
+        HomeModelColumn.Width=new GridLength(e.NewSize.Width<780 ? 210 : 280);
+        BleConnectionTitleText.FontSize=e.NewSize.Width<780 ? 24 : 28;
+    }
+    private void HomeDashboard_Loaded(object sender,RoutedEventArgs e)
+    {
+        UpdateHomeModeSelection(false);
+        if(homeRevealPlayed)return;
+        homeRevealPlayed=true;
+        if(!SystemParameters.ClientAreaAnimation)return;
+        var move=new System.Windows.Media.TranslateTransform();
+        HomeDashboardContent.RenderTransform=move;
+        move.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(4,0,TimeSpan.FromMilliseconds(170))
+            {EasingFunction=new System.Windows.Media.Animation.CubicEase {EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}});
+    }
+    private void HomeModeRail_SizeChanged(object sender,SizeChangedEventArgs e) => UpdateHomeModeSelection(false);
+    private void UpdateHomeModeSelection(bool animate)
+    {
+        if(HomeModeRail==null || ActiveModePill==null || DataContext is not MainViewModel vm)return;
+        int index=vm.HomeModeIndex;
+        double cell=HomeModeRail.ActualWidth/4;
+        if(cell<=4)return;
+        ActiveModePill.Width=cell-4;
+        double target=cell*index+2;
+        bool changed=homeModeIndex!=index;
+        homeModeIndex=index;
+        if(!animate || !SystemParameters.ClientAreaAnimation)
+        {
+            HomeModePillTransform.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty,null);
+            HomeModePillTransform.X=target;
+            return;
+        }
+        if(!changed)return;
+        HomeModePillTransform.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(target,TimeSpan.FromMilliseconds(210))
+            {EasingFunction=new System.Windows.Media.Animation.CubicEase {EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut}});
+    }
     private async void SelectUsbipPath_Click(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm || !vm.CanManageRuntime) return;
@@ -44,9 +117,14 @@ public partial class MainWindow : Window
         {
             if (DataContext is MainViewModel vm) vm.RefreshCompactTelemetry();
         };
-        IsVisibleChanged += (_, _) =>
+        IsVisibleChanged += async (_, _) =>
         {
             UpdatePresentationRefresh();
+            if(!IsVisible && DataContext is MainViewModel vm)
+            {
+                rumbleMouseGesture=false;rumbleKeyboardGesture=false;
+                await vm.StopRumblePreviewAsync();
+            }
         };
         if (DataContext is MainViewModel viewModel)
         {
@@ -66,11 +144,12 @@ public partial class MainWindow : Window
         try
         {
             IntPtr handle = new WindowInteropHelper(this).Handle;
-            int enabled = 0;
+            int enabled = 1;
             if (DwmSetWindowAttribute(handle, 20, ref enabled, sizeof(int)) != 0)
             {
                 _ = DwmSetWindowAttribute(handle, 19, ref enabled, sizeof(int));
             }
+            NeonWindowChrome.Apply(this);
         }
         catch
         {
@@ -113,6 +192,10 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        if(Array.Exists(Environment.GetCommandLineArgs(),argument=>argument=="--rumble-settings"))MainTabs.SelectedIndex=1;
+        if (Array.Exists(Environment.GetCommandLineArgs(), argument =>
+            string.Equals(argument, "--controller-test", StringComparison.OrdinalIgnoreCase)))
+            MainTabs.SelectedItem = ControllerTestTab;
         UpdatePresentationRefresh();
         if (!IsUiSmokeRun()) FitStartupWindow();
         if (DataContext is MainViewModel initial) initial.RefreshCompactTelemetry();
@@ -132,6 +215,11 @@ public partial class MainWindow : Window
             }
             else
                 await viewModel.RunStartupAutomationAsync();
+            if(Array.Exists(Environment.GetCommandLineArgs(),argument=>argument=="--rumble-preview-once"))
+            {
+                await System.Threading.Tasks.Task.Delay(300);
+                viewModel.RequestRumblePreview(400);
+            }
 #if PRO2_BATTERY_READ_EXPERIMENT
             if (Environment.GetCommandLineArgs().Contains("--battery-followup-test", StringComparer.OrdinalIgnoreCase))
             {
@@ -149,6 +237,8 @@ public partial class MainWindow : Window
 
     private void MainViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainViewModel.HomeModeIndex))
+            _ = Dispatcher.BeginInvoke(new Action(() => UpdateHomeModeSelection(true)));
         if (e.PropertyName == nameof(MainViewModel.Win10BleHomePanelExpanded))
         {
             // The panel's Auto row and compact hero change in one binding update.

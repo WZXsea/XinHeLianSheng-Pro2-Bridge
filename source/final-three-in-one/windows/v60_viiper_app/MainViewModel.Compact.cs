@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -70,11 +71,24 @@ public sealed partial class MainViewModel
     }
     public string CompactBattery => compactBattery;
     public BatteryVisual CompactBatteryVisual => compactBatteryVisual;
+    public string HomeBatteryStatus
+    {
+        get
+        {
+            var battery=inputSource.GetBatterySnapshot();
+            string age=battery.HasConnectionLevel ? battery.RuntimeLevel ? battery.LevelFresh ? "已更新" : "上次读取" : "连接时读取" : "";
+            string power=compactBatteryVisual.Charge;
+            return power.Length>0 && age.Length>0 ? power+" · "+age : power+age;
+        }
+    }
     public string CompactBatteryHint
     {
         get
         {
             var battery = inputSource.GetBatterySnapshot();
+            if(inputSource.IsUsb)
+                return "显示手柄原生 0–9 档位。USB 约每 5 分钟更新一次；连续空闲 5 秒后短暂采样，操作时延后。"+
+                    "异常时暂停自动更新并保留上次读取值；充电状态持续更新。";
             string unavailable = inputSource.BatteryLevelReadStatus == "read_not_permitted"
                 ? " 手柄拒绝直接读取档位（ATT 0x02）；定时更新使用新的通知报告，不重复 Read。"
                 : " 尚未取得原生档位；不按电压猜测百分比。";
@@ -108,10 +122,33 @@ public sealed partial class MainViewModel
     }
     public string CompactHapticSource => (session ?? pro2Slots[0].Session)?.FeedbackSource ?? "等待游戏反馈";
     public string CompactActualMode => activeMode.HasValue ? ProfileFor(activeMode.Value).Label : "尚未创建虚拟手柄";
+    public int HomeModeIndex => IsXboxSelected ? 2 : IsDualSenseSelected ? 3 : IsPro1Selected ? 1 : 0;
+    public string HomeModeDescription => HomeModeIndex switch
+    {
+        1 => "Switch Pro 兼容模式 · 支持软件背键映射",
+        2 => "适合多数 PC 游戏 · Xbox 键位与普通震动",
+        3 => "PS5 兼容模式 · 支持触觉转换与陀螺仪",
+        _ => "适合搭配 Steam Input · 支持陀螺仪"
+    };
+    public string HomeOutputLabel => Running ? CompactActualMode : "尚未启动";
+    public string HomeInputSummary => !inputSource.IsTransportConnected ? "等待手柄连接" :
+        inputSource.IsGameplayReady ? "输入正常" : "正在检查输入";
+    public string HomeLowRateHint => inputSource.IsGameplayReady
+        ? "当前可以游玩；如需改善连接，请前往设置查看建议。"
+        : "请保持手柄连接，输入恢复后会自动继续。也可尝试 USB 数据线。";
+    public string HomeConnectionHint => inputSource.IsGameplayReady
+        ? inputSource.IsUsb ? "数据线已连接，随时进入游戏。拔线后可自动恢复蓝牙连接。"
+            : "无线连接已就绪，随时进入游戏。插入数据线会优先切换到有线。"
+        : inputSource.IsTransportConnected ? "已找到手柄，正在准备输入，请稍候。"
+        : AutoReconnectEnabled ? "正在寻找你的手柄。打开手柄或插入 USB 数据线即可连接。"
+        : "选择游戏输出模式，然后连接你的 NS2 Pro 手柄。";
+    public string HomeSessionSummary => Busy ? "正在处理连接，请稍候…" : Running
+        ? CompactActualMode+" · 游戏输出已启动" : AutoReconnectEnabled
+            ? "正在寻找手柄 · 自动重连已开启" : "选择输出模式，然后连接手柄";
     public string CompatibilityTitle => BleCompatibilityInspector.Current.Plan.Title;
     public string CompatibilityGuidance => BleCompatibilityInspector.Current.Plan.Guidance;
     public bool CanConfigureWin10Stack => BleCompatibilityInspector.Current.Plan.CanConfigureWin10Stack;
-    private Pro2ConnectionPresentation ConnectionPresentation =>
+    private Pro2ConnectionPresentation ConnectionPresentation => inputSource.IsUsb ? UsbPresentation :
         Pro2ConnectionPresentation.Create(inputSource.ConnectionPhase,
             inputSource.IsTransportConnected, Running, Busy, AutoReconnectEnabled, inputSource.IsGameplayReady);
     public string CompactConnectionTitle => ConnectionPresentation.Title;
@@ -175,7 +212,7 @@ public sealed partial class MainViewModel
                 battery.RuntimeLevel ? battery.LevelFresh && RuntimeBatteryRefreshEnabled ? "定时更新" : "上次读取" : "连接时档位");
         compactInputAge = inputSource.IsRunning && counters.LastTicks > 0
             ? Stopwatch.GetElapsedTime(counters.LastTicks, now).TotalMilliseconds.ToString("0") + " ms" : "—";
-        foreach (string property in new[] { nameof(CompactInputRate), nameof(CompactRawRate),
+        foreach (string property in new[] { nameof(CompactInputSourceLabel), nameof(CompactInputRate), nameof(CompactRawRate),
                      nameof(CompactParsedRate), nameof(CompactBattery), nameof(CompactInputAge),
                      nameof(CompactHapticSource), nameof(CompactActualMode), nameof(RumblePercentText), nameof(CompactBatteryHint), nameof(CompactBatteryVisual),
                      nameof(CompactFirmware), nameof(CompactFirmwareHint), nameof(CompactHeadset), nameof(EnvironmentReportText) })
@@ -189,12 +226,17 @@ public sealed partial class MainViewModel
         RefreshBleCompatibilityPresentation();
         RefreshLowRateDiagnosis();
         QueueLowRateAutomaticOptimization();
-        foreach (string property in new[] { nameof(CompactPs5Selected),
+        foreach (string property in new[] { nameof(CompactPs5Selected), nameof(HomeSessionSummary),
+                     nameof(HomeModeIndex), nameof(HomeModeDescription), nameof(HomeOutputLabel),
+                     nameof(HomeInputSummary), nameof(HomeLowRateHint), nameof(HomeConnectionHint), nameof(HomeBatteryStatus),
+                     nameof(CanPreviewRumble), nameof(RumblePreviewHint),
+                     nameof(ActiveInputTransportText), nameof(ActiveInputTransportHint),
                      nameof(BleStabilitySummary), nameof(ShowWin11CompatibilityAction), nameof(CanTryWin11Compatibility),
                      nameof(CompactConnectionTitle), nameof(CompactConnectionHint),
                      nameof(CompactConnectText), nameof(CompactCanConnect), nameof(CompactStateText), nameof(CompactFirmware), nameof(CompactFirmwareHint), nameof(CompactHeadset), nameof(EnvironmentReportText) })
             OnPropertyChanged(property);
         OnPropertyChanged(nameof(CompactCanStop));
+        (previewRumbleCommand as RelayCommand)?.RefreshCanExecute();
     }
 
     private void OnInputConnectionStateChanged()

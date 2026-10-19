@@ -1,10 +1,11 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Diagnostics;
 using System.Linq;
 
 namespace Y700Switch2V60Viiper;
 
-public enum RearButtonAction { Hold, Tap, Repeat, Sequence }
+public enum RearButtonAction { Hold, Tap, Repeat, Sequence, Disabled }
 
 public sealed record RearButtonStep
 {
@@ -69,10 +70,11 @@ public sealed record RearButtonConfiguration
     public RearButtonProfile Xbox { get; init; } = new();
     public RearButtonProfile Ps5 { get; init; } = new();
     public RearButtonProfile Pro1 { get; init; } = new();
+    public RearButtonProfile Pro2 { get; init; } = new();
     public RearButtonConfiguration Normalize() => new()
     {
         Xbox = (Xbox ?? new()).Normalize(), Ps5 = (Ps5 ?? new()).Normalize(),
-        Pro1 = (Pro1 ?? new()).Normalize()
+        Pro1 = (Pro1 ?? new()).Normalize(), Pro2 = (Pro2 ?? new()).Normalize()
     };
     public RearButtonProfile? ForMode(ViiperVirtualMode mode) => mode switch
     {
@@ -80,7 +82,8 @@ public sealed record RearButtonConfiguration
         ViiperVirtualMode.DualSenseLike or
             ViiperVirtualMode.DualSenseProfessionalImuTest => Ps5,
         ViiperVirtualMode.Pro1 => Pro1,
-        _ => null // Native Pro2 controls, including GL/GR, are never remapped here.
+        ViiperVirtualMode.Pro2 => Pro2,
+        _ => null
     };
 }
 
@@ -207,6 +210,7 @@ public sealed class RearButtonMapper
                 return GamepadButtons.None;
             }
             if (!binding.Enabled) { active = false; down = pressed; return Emit(GamepadButtons.None); }
+            if (binding.Action == RearButtonAction.Disabled) { active = false; down = pressed; return Emit(GamepadButtons.None); }
             // No queue and no overlapping restart for delayed taps/sequences.
             if (pressed && !down && !active) { active = true; start = ticks; }
             down = pressed;

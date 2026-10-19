@@ -7,6 +7,14 @@ obj/
 .vs/
 .toolchain/
 __pycache__/
+/artifacts/
+.env
+.env.*
+*.pfx
+*.pem
+*.key
+v6_settings.json
+v6_logs/
 _handoff/
 CODEX_HANDOFF_*.md
 

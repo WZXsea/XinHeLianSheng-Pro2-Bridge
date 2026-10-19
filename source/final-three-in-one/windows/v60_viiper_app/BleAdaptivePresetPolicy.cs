@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -56,6 +57,7 @@ public static class BleAdaptivePresetPolicy
     public const double MaximumWindowSeconds = 30;
     public const double MaximumWindowAgeSeconds = 15;
     public const double RateNoiseToleranceHz = 2;
+    public const double FinalRateNoiseToleranceRatio = .05;
     public const int CacheLifetimeDays = 7;
 
     private static readonly BleAdaptivePresetCandidate[] Windows11Candidates =
@@ -65,6 +67,8 @@ public static class BleAdaptivePresetPolicy
         new(BleAdaptivePreset.Win11ThroughputOptimized, "win11_throughput", "系统吞吐量优先", null, null, null, null, false),
         new(BleAdaptivePreset.Win11Fixed15, "win11_fixed_15", "固定 15ms", 12, 12, 0, 600, true)
     };
+    public static BleAdaptivePresetCandidate? FindCandidate(BleAdaptivePreset preset) =>
+        Windows11Candidates.FirstOrDefault(candidate => candidate.Preset == preset);
 
     public static BleAdaptivePresetPlan CreatePlan(BleAdaptiveCapabilities capabilities,
         BleAdaptiveMeasurement native, BleAdaptivePreset? preferredPreset = null)
@@ -155,13 +159,18 @@ public static class BleAdaptivePresetPolicy
         return Reject("no_meaningful_improvement", "没有达到可确认的频率或稳定性改善，恢复此前最佳路线。");
     }
 
-    /// <summary>Final ten-second verify is required even after an earlier target window.</summary>
+    /// <summary>
+    /// Final ten-second verification compares repeated windows of the same preset.
+    /// Allow bounded relative radio variation without relaxing candidate ranking,
+    /// timing checks, or the playable/target thresholds.
+    /// </summary>
     public static BleAdaptivePresetDecision VerifyFinal(BleAdaptiveMeasurement retained,
         BleAdaptiveMeasurement final)
     {
         if (!Valid(retained, false) || !Valid(final, false) || !MatchingWindows(retained, final))
             return new(false, "final_measurement_invalid", "最终完整窗口无效，不能宣称稳定达标。");
-        if (Regressed(retained, final) || GapRegressed(retained, final) || MeetsTarget(retained) && !MeetsTarget(final))
+        if (Regressed(retained, final, FinalRateNoiseToleranceRatio) || GapRegressed(retained, final) ||
+            IsPlayable(retained) && !IsPlayable(final) || MeetsTarget(retained) && !MeetsTarget(final))
             return new(false, "final_verification_regressed", "最终复核发生降速或明显卡顿，不能宣称稳定 133Hz。");
         return new(true, MeetsTarget(final) ? "final_target_verified" : IsPlayable(final) ? "final_playable_verified" : "final_low_rate_verified",
             MeetsTarget(final) ? "最终窗口真实输入达到 133Hz 级；后续仍持续监测。" :
@@ -202,9 +211,12 @@ public static class BleAdaptivePresetPolicy
     private static bool MatchingWindows(BleAdaptiveMeasurement a, BleAdaptiveMeasurement b) =>
         Math.Abs(a.Sample.DurationSeconds - b.Sample.DurationSeconds) <=
         Math.Min(a.Sample.DurationSeconds, b.Sample.DurationSeconds) * BleMeasuredTrialPolicy.MaximumWindowDifferenceRatio;
-    private static bool Regressed(BleAdaptiveMeasurement before, BleAdaptiveMeasurement after) =>
-        after.Sample.Fd2Hz < before.Sample.Fd2Hz - RateNoiseToleranceHz - 1e-9 ||
-        after.Sample.ParsedHz < before.Sample.ParsedHz - RateNoiseToleranceHz - 1e-9;
+    private static bool Regressed(BleAdaptiveMeasurement before, BleAdaptiveMeasurement after,
+        double relativeTolerance = 0) =>
+        RateRegressed(before.Sample.Fd2Hz, after.Sample.Fd2Hz, relativeTolerance) ||
+        RateRegressed(before.Sample.ParsedHz, after.Sample.ParsedHz, relativeTolerance);
+    private static bool RateRegressed(double before, double after, double relativeTolerance) =>
+        after < before - Math.Max(RateNoiseToleranceHz, before * relativeTolerance) - 1e-9;
     private static int CompareKnownGap(double? left, double? right) =>
         left.HasValue && right.HasValue ? -left.Value.CompareTo(right.Value) : 0;
     private static bool GapRegressed(BleAdaptiveMeasurement before, BleAdaptiveMeasurement after) =>
@@ -217,7 +229,7 @@ public static class BleAdaptivePresetPolicy
         before.HasValue && after.HasValue && after.Value > before.Value + Math.Max(absolute, before.Value * ratio);
     private static bool ReducedGap(double? before, double? after, double absolute, double ratio) =>
         before.HasValue && after.HasValue && after.Value <= before.Value - Math.Max(absolute, before.Value * ratio);
-    private static bool ValidEnvironment(BleAdaptiveEnvironmentKey key) =>
+    internal static bool ValidEnvironment(BleAdaptiveEnvironmentKey key) =>
         key.WindowsBuild >= 22000 && key.BluetoothStackSha256 != null && key.BluetoothStackSha256.Length == 64 &&
         key.BluetoothStackSha256.All(Uri.IsHexDigit) && Known(key.AdapterPnpId) && Known(key.AdapterSetFingerprint) &&
         Known(key.DriverProvider) && Known(key.DriverVersion) && Known(key.DriverDate) && Known(key.PolicyRevision);

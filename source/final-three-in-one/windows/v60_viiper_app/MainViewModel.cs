@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -99,7 +100,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             ? Path.Combine(Path.GetTempPath(), "PRO2-ui-smoke-logs") : null);
         userSettings = previewOnly ? new V60UserSettings() : V60UserSettings.Load();
         InitializeRearButtonSettings();
+        InitializeConfigurationCenter();
         inputSource = pro2Slots[0].InputSource;
+        ConfigureInputTransport();
         InitializeBleCompatibilitySettings();
         inputSource.ConnectionStateChanged += OnInputConnectionStateChanged;
         foreach (Pro2ControllerSlot slot in pro2Slots)
@@ -215,6 +218,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             SaveUserSettings("[STARTUP]");
         }
         selectedMode = ModeFromKey(userSettings.SelectedModeKey);
+        RearEditingMode = selectedMode switch
+        {
+            ViiperVirtualMode.Xbox or ViiperVirtualMode.XboxProfessionalImuTest => "Xbox",
+            ViiperVirtualMode.DualSenseLike or ViiperVirtualMode.DualSenseProfessionalImuTest => "PS5",
+            ViiperVirtualMode.Pro1 => "Pro1", _ => "Pro2"
+        };
         inputSource.SetRumbleGain(rumbleMultiplier);
         inputSource.SetStickProcessingMode(SelectedStickProcessingOption.Mode);
         ApplyPro2SlotRuntimeOptions();
@@ -243,6 +252,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                   "MB; recent status remains live in a bounded 128KB snapshot; VIIPER server log level=info.");
         AppendLog("[RUNTIME] " + RuntimeReadinessText);
         AppendLog("[RUMBLE_GAIN] multiplier=" + rumbleMultiplier.ToString("F1"));
+        AppendLog("[FACE_BUTTON_MAPPING] swap_ab=" + SwapABButtons + " swap_xy=" + SwapXYButtons + " source=saved_settings");
         AppendLog("[STARTUP] launch_at_login=" + launchAtLoginEnabled +
                   " auto_reconnect_on_startup=" + autoReconnectOnStartupEnabled +
                   " selected_mode=" + ModeKey(selectedMode));
@@ -262,6 +272,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                   " audio_guard=" + AudioEndpointGuardEnabled +
                   " backend=" + SelectedBackendOption.Label);
         InitializeEnvironmentInfo();
+        if (!previewOnly) transportMonitorTask = MonitorInputTransportAsync(lifetimeCts.Token);
     }
 
     public string Host
@@ -317,6 +328,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanManualBleControl));
             OnPropertyChanged(nameof(CanTryWin11Compatibility));
             (ApplyRearButtonsCommand as RelayCommand)?.RefreshCanExecute();
+            (SaveConfigurationCommand as RelayCommand)?.RefreshCanExecute();
+            (ResetConfigurationCommand as RelayCommand)?.RefreshCanExecute();
             OnPropertyChanged(nameof(CompactCanConnect));
         }
     }
@@ -444,7 +457,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             }
 
             rumbleMultiplier = normalized;
-            ApplyPro2SlotRuntimeOptions();
+            foreach(Pro2ControllerSlot slot in pro2Slots)slot.InputSource.SetRumbleGain(normalized);
             userSettings.RumbleMultiplier = normalized;
             try
             {
@@ -1504,8 +1517,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     private async Task TryConnectPro2InputOnceAsync(CancellationToken cancellationToken)
     {
-        Status = "正在扫描并连接 Pro2 BLE；将依次验证 GATT、初始化命令和 live 输入。";
-        InputStatus = "正在连接 Pro2 BLE...";
+        Status = "正在连接 Pro2；将按连接方式验证真实输入。";
+        InputStatus = "正在连接 Pro2...";
         var progress = new DirectProgress<string>(AppendLog);
         await bleOperationGate.WaitAsync(cancellationToken);
         try
@@ -1534,7 +1547,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             pro2Slots[0].RefreshFromSource();
             RememberConnectedAddress(pro2Slots[0]);
             MarkStartupAutomationConnected("primary");
-            Status = inputSource.IsPerformanceDegraded
+            Status = inputSource.IsUsb ? "USB 有线已连接，真实输入验收通过；按键映射和测试页均可使用。" : inputSource.IsPerformanceDegraded
                 ? "真实 BLE 已连接，但输入速率未达标；保留物理连接，未通过验收时不创建虚拟输出。"
                 : Running
                     ? "真实 Pro2 BLE 已接入，当前虚拟模式将自动切换为 live 输入和 rumble 写回。"
@@ -1542,7 +1555,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
         else
         {
-            Status = "真实 Pro2 BLE 未连接。请唤醒手柄，并确认没有被其他设备占用。";
+            Status = inputSource.RequestedTransport == Pro2InputTransport.Usb
+                ? "USB 手柄未连接。请插入数据线，并确认没有被其他手柄软件占用。"
+                : "Pro2 未连接。可使用数据线，或唤醒手柄开启蓝牙配对。";
         }
         RaiseConnectionStateChanged();
     }
@@ -1857,7 +1872,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                     {
                         previouslyLive = true;
                         InputStatus = inputSource.Status;
-                        Status = inputSource.IsHighRateReady
+                        Status = inputSource.IsUsb ? "USB 有线已连接，输入验收通过；正在准备游戏输出。" : inputSource.IsHighRateReady
                             ? "真实 Pro2 BLE 已连接，输入验收通过；正在准备所选游戏模式。"
                             : inputSource.IsGameplayReady ? "真实输入已达到兼容速率，可以游玩；首页显示蓝牙优化建议。"
                             : "BLE 已连接，输入尚未达到 60Hz 兼容门槛；保留连接等待，不反复断开。";
@@ -2250,6 +2265,13 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     private void RememberConnectedAddress(Pro2ControllerSlot slot)
     {
+        if (slot.InputSource.IsUsb)
+        {
+            // USB calibration is keyed separately; never replace the saved BLE address
+            // with a USB container id, or later Bluetooth reconnection would target it.
+            ApplySavedStickCalibration(slot, slot.InputSource.ConnectedAddress, logChange: true);
+            return;
+        }
         string address = V60UserSettings.NormalizeBleAddress(slot.InputSource.ConnectedAddress);
         if (string.IsNullOrWhiteSpace(address))
         {
@@ -2811,9 +2833,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         int virtualCount = pro2Slots.Count(slot => slot.VirtualDeviceRunning);
         int liveCount = pro2Slots.Count(slot => slot.InputSource.IsRunning);
+        int usbCount = pro2Slots.Count(slot => slot.InputSource.IsRunning && slot.InputSource.IsUsb);
         InputStatus = ActiveProfile.Label + " 多手柄：虚拟实例 " + virtualCount +
-                      " 个，真实 Pro2 BLE live " + liveCount +
-                      " 个。启用的 Slot 会独立扫描、独立回传震动。";
+                      " 个，真实输入 " + liveCount + " 个（USB " + usbCount + " / 蓝牙 " + (liveCount - usbCount) + "）" +
+                      "。启用的 Slot 会独立扫描、独立回传震动。";
         Status = InputStatus;
         RaiseConnectionStateChanged();
     }
@@ -2998,7 +3021,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 professionalImuOptions,
                 professionalHidAuditController,
                 new Progress<ProfessionalImuUiSnapshot>(UpdateProfessionalImuSnapshot),
-                userSettings.RearButtons);
+                userSettings.RearButtons,
+                CurrentFaceButtonMapping);
             session = createdSession;
             await createdSession.StartAsync(cancellationToken);
             SetActiveMode(runtimeProfile.Mode);
@@ -3011,7 +3035,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             DiagnoseSteamControllerCache(runtimeProfile);
             Status = runtimeProfile.Label + " 虚拟设备已连接。当前输入源：" +
                 (inputLive
-                    ? "Pro2 BLE live，rumble 写回已启用"
+                    ? "Pro2 " + inputSource.TransportLabel + " live，rumble 写回已启用"
                     : "neutral；稍后点击“连接 Pro2 BLE”即可在不中断虚拟设备的情况下切换为 live 输入") + "。";
         }
         catch (Exception ex)
@@ -3101,7 +3125,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 ProfessionalImuOptions.Default,
                 professionalHidAuditController,
                 new Progress<ProfessionalImuUiSnapshot>(UpdateProfessionalImuSnapshot),
-                userSettings.RearButtons);
+                userSettings.RearButtons,
+                CurrentFaceButtonMapping);
 
             try
             {
@@ -3688,6 +3713,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         shuttingDown = true;
         lifetimeCts.Cancel();
+        if (transportMonitorTask != null) await transportMonitorTask;
         await operationGate.WaitAsync();
         Busy = true;
         try

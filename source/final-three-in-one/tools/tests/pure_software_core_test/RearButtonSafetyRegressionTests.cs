@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
@@ -25,6 +26,67 @@ internal static class RearButtonSafetyRegressionTests
             await LiveConsumerAsync(mode);
             await LiveConsumerAsync(mode, cKey: true);
         }
+        foreach (var profile in new[] { ViiperDeviceProfile.Xbox, ViiperDeviceProfile.Pro1,
+            ViiperDeviceProfile.Pro2, ViiperDeviceProfile.DualSenseLike })
+            await FaceButtonConsumerAsync(profile);
+    }
+
+    private static async Task FaceButtonConsumerAsync(ViiperDeviceProfile template)
+    {
+        var profile = template with { SourcePaced = true };
+        var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start();
+        using var writer = new TcpClient { NoDelay = true };
+        var accepting = listener.AcceptTcpClientAsync();
+        await writer.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port);
+        using var reader = await accepting;
+        var source = new FakeSource();
+        var stream = new ViiperDeviceStream(writer, writer.GetStream());
+        await using var session = new ViiperBridgeSession(new("127.0.0.1", 1), profile,
+            new InlineProgress<string>(_ => { }), source, faceButtonMapping: new(true, true));
+        typeof(ViiperBridgeSession).GetMethod("SetStream", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(session, [stream]);
+        using var stop = new CancellationTokenSource();
+        var physical = State(GamepadButtons.East | GamepadButtons.North | GamepadButtons.L1);
+        source.Feed(physical);
+        var loop = (Task)typeof(ViiperBridgeSession).GetMethod("InputLoopAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(session, [stop.Token])!;
+        async Task Expect(GamepadButtons buttons, string label, ushort? lt = null, bool neutral = false)
+        {
+            var expected = neutral ? GamepadState.Neutral() : physical.Clone(); expected.Buttons = buttons;
+            if (lt.HasValue) expected.L2 = lt.Value;
+            var bytes = new byte[profile.InputSize]; using var timeout = new CancellationTokenSource(2000);
+            await reader.GetStream().ReadExactlyAsync(bytes, timeout.Token);
+            check(bytes.AsSpan().SequenceEqual(VirtualPadPackets.FromGamepad(profile, expected)), "live face mapping " + profile.Mode + "/" + label);
+        }
+        try
+        {
+            await Expect(GamepadButtons.South | GamepadButtons.West | GamepadButtons.L1, "saved mapping reaches real output consumer");
+            session.SetFaceButtonMapping(new(false, false)); source.Feed(physical);
+            await Expect(physical.Buttons, "held buttons move to original outputs without reconnect or stuck old bits");
+            session.SetFaceButtonMapping(new(true, false)); source.Feed(physical);
+            await Expect(GamepadButtons.South | GamepadButtons.North | GamepadButtons.L1, "independent live AB change");
+            var remaps = new ButtonRemap[] { new(GamepadButtons.East, GamepadButtons.R1 | GamepadButtons.L2),
+                new(GamepadButtons.North, GamepadButtons.None), new(GamepadButtons.L1, GamepadButtons.None) };
+            session.SetFaceButtonMapping(new(false, false, new() { Xbox = remaps, Ps5 = remaps, Pro1 = remaps, Pro2 = remaps }));
+            source.Feed(physical);
+            await Expect(GamepadButtons.R1 | GamepadButtons.L2, "custom chord and disable reach actual packet consumer", 4095);
+            var rearConfig = new RearButtonConfiguration { Xbox = new() { C = new() { Enabled = true, Buttons = GamepadButtons.East } },
+                Ps5 = new() { C = new() { Enabled = true, Buttons = GamepadButtons.East } },
+                Pro1 = new() { C = new() { Enabled = true, Buttons = GamepadButtons.East } },
+                Pro2 = new() { C = new() { Enabled = true, Buttons = GamepadButtons.East } } };
+            session.SetRearButtons(rearConfig);
+            physical = State(); source.Feed(physical); await Expect(GamepadButtons.None, "custom trigger releases to zero");
+            physical = State(GamepadButtons.Aux); source.Feed(physical);
+            await Expect(GamepadButtons.East, "C action output is not remapped a second time");
+            physical = State(); source.Feed(physical);
+            await Expect(GamepadButtons.None, "release reaches neutral");
+            physical = State(GamepadButtons.East); source.Feed(physical);
+            await Expect(GamepadButtons.R1 | GamepadButtons.L2, "button held before transport handover",4095);
+            source.Running=false;source.Wake();
+            await Expect(GamepadButtons.None,"transport handover clears held keys on the same virtual stream",neutral:true);
+            source.Running=true;physical=State(GamepadButtons.West);source.Feed(physical);
+            await Expect(GamepadButtons.West,"same consumer resumes fresh input without rebuilding virtual device");
+            check(!loop.IsCompleted,"transport recovery retains output consumer " + profile.Mode);
+        }
+        finally { stop.Cancel(); source.Wake(); try { await loop; } catch (OperationCanceledException) { } listener.Stop(); }
     }
 
     private static void Deterministic()

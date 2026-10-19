@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -22,7 +23,7 @@ public sealed partial class Pro2BleInputSource
         get
         {
             Pro2RateEvidence rate = GetRateEvidence();
-            return rate.RecentWindow && rate.LastInputAgeMs is >= 0 and < 500 &&
+            return !IsUsb && rate.RecentWindow && rate.LastInputAgeMs is >= 0 and < 500 &&
                 rate.ParsedHz >= rate.Fd2Hz * .95 && BleAdaptivePresetPolicy.CanOptimizeInApp(
                     OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000),
                     BleCompatibilityInspector.Current.Plan.CanRequestPreferredParameters,
@@ -88,13 +89,15 @@ public sealed partial class Pro2BleInputSource
                 { progress.Report("[BLE_AUTO_PRESET] metadata_unavailable=" + ex.GetType().Name + " trial_allowed_without_cache=true"); }
                 cached = BleAdaptivePresetStore.Load(environmentKey, out string cacheCode);
                 progress.Report("[BLE_AUTO_PRESET] cache=" + cacheCode + " remembered_preset=" +
-                    (cached?.Preset.ToString() ?? "none") + " cache_is_retest_hint_only=true");
+                    (cached?.Preset.ToString() ?? "none") + " live_input_required=true");
                 win11ParameterRouteStatus = "AdaptiveBoundedPresets";
             }
+            bool fastAttempt = false;
             var backend = new AdaptiveTrialBackend(SameConnection,
                 async (phase, ct) =>
                 {
-                    BleTrialMeasurement measured = await CaptureParameterTrialAsync("AUTO_" + phase, 10000, progress, ct);
+                    BleTrialMeasurement measured = await CaptureParameterTrialAsync("AUTO_" + phase,
+                        phase == BleFastReconnectPolicy.MeasurementPhase ? BleFastReconnectPolicy.SampleMilliseconds : 10000, progress, ct);
                     RecordAdaptiveMeasurement(diagnosticCapture, measured);
                     var sample = new BleAdaptiveMeasurement(ToMeasuredTrialSample(measured, SameConnection()),
                         MaximumGapMs: measured.Gaps.MaxMs);
@@ -107,9 +110,45 @@ public sealed partial class Pro2BleInputSource
                     if (candidate != null) win11CompatibilityTrialAttempted = true;
                     bool submitted = SubmitAdaptiveConnectionPreset(owner, candidate, original, diagnosticCapture, progress);
                     // Allow parameter negotiation before counting a full 10s window.
-                    if (submitted && ct.CanBeCanceled) await Task.Delay(1500, ct);
+                    if (submitted && ct.CanBeCanceled) await Task.Delay(fastAttempt ? BleFastReconnectPolicy.NegotiationMilliseconds : 1500, ct);
                     return submitted;
                 }, () => ReleaseAdaptiveTrialRequest(diagnosticCapture, progress), Report);
+            if (initializing && capabilities.Win11 && capabilities.RequestApi && environmentKey != null)
+            {
+                string address = FormatAddress(owner.BluetoothAddress);
+                var remembered = BleReconnectProfileStore.Load(address,environmentKey,out string reconnectCode);
+                // The old cache has no controller identity. Only a controller
+                // already in the app's saved-address list may use it as a hint,
+                // and only today's successful two-second window binds the hint.
+                if (remembered == null && reconnectCode == "reconnect_profile_absent" && reconnectKnownController && cached != null)
+                    remembered = new(address,environmentKey,cached.Preset,cached.Verified,cached.VerifiedAtUtc);
+                progress.Report("[BLE_FAST_RECONNECT] profile=" + reconnectCode + " controller=" + address);
+                if (remembered != null)
+                {
+                    BleFastReconnectResult fast;
+                    fastAttempt = true;
+                    try { fast = await BleFastReconnectRunner.TryAsync(remembered,backend,deadline.Token); }
+                    finally { fastAttempt = false; }
+                    if (fast.Success && SameConnection() && fast.Live != null)
+                    {
+                        RecordFastReconnectEvidence(diagnosticCapture,remembered,fast.Live);
+                        diagnosticsCompleted = true;
+                        pendingFastReconnectProfile = remembered;
+                        try { BleReconnectProfileStore.Save(remembered); }
+                        catch (Exception ex) { progress.Report("[BLE_FAST_RECONNECT] save_error=" + ex.GetType().Name); }
+                        win11ParameterRouteStatus = "CachedFastReconnect";
+                        compatibilityOptimizationSummary = "已恢复上次参数 · 实测 " + fast.Live.EffectiveHz.ToString("F1") +
+                            " Hz · 快速检查通过，后台继续观察";
+                        progress.Report("[BLE_FAST_RECONNECT] ready=true measured_s=" + fast.Live.Sample.DurationSeconds.ToString("F2") +
+                            " parsed_hz=" + fast.Live.Sample.ParsedHz.ToString("F2") + " full_test_skipped=true background_observe_s=10");
+                        return new(true,"fast_reconnect_ready",compatibilityOptimizationSummary);
+                    }
+                    try { BleReconnectProfileStore.Disable(remembered); }
+                    catch (Exception ex) { progress.Report("[BLE_FAST_RECONNECT] invalidate_error=" + ex.GetType().Name); }
+                    if (!SameConnection()) return new(false,"connection_changed","快速重连期间连接已改变。");
+                    Report("快速检查未通过 · 回退完整参数测试（" + fast.Code + "）");
+                }
+            }
             BleAdaptiveRunResult result = await BleAdaptiveSessionRunner.RunAsync(capabilities, backend, cached?.Preset, deadline.Token);
             CompleteAdaptiveDiagnosticEvidence(diagnosticCapture, result);
             diagnosticsCompleted = true;
@@ -153,6 +192,9 @@ public sealed partial class Pro2BleInputSource
                 if (environmentKey != null && result.Selected != null && result.FinalVerified)
                     BleAdaptivePresetStore.Save(new(environmentKey, result.Selected.Preset, result.Native, result.Final, DateTimeOffset.UtcNow));
                 else BleAdaptivePresetStore.Invalidate(environmentKey);
+                if (environmentKey != null && result.FinalVerified && BleAdaptivePresetPolicy.IsPlayable(result.Final))
+                    BleReconnectProfileStore.Save(new(FormatAddress(owner.BluetoothAddress),environmentKey,
+                        result.Selected?.Preset ?? BleAdaptivePreset.Native,result.Final,DateTimeOffset.UtcNow));
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
             catch (Exception ex) { progress.Report("[BLE_AUTO_PRESET] result_save_error=" + ex.GetType().Name); }

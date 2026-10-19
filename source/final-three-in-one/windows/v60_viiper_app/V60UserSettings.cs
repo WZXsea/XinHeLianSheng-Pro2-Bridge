@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,6 +16,10 @@ public sealed class V60UserSettings
     public string StickProcessingLabel { get; set; } = StickProcessingOption.Default.Label;
     public string SelectedModeKey { get; set; } = "pro2";
     public RearButtonConfiguration RearButtons { get; set; } = new();
+    public bool SwapABButtons { get; set; }
+    public bool SwapXYButtons { get; set; }
+    public ButtonRemappingConfiguration ButtonRemapping { get; set; } = new();
+    public Pro2InputTransport InputTransport { get; set; } = Pro2InputTransport.Auto;
     public bool LaunchAtLoginEnabled { get; set; }
     public bool AutoReconnectOnStartupEnabled { get; set; }
     public string[] LastConnectedPro2Addresses { get; set; } = new string[4];
@@ -59,6 +64,7 @@ public sealed class V60UserSettings
                 loaded.SelectedModeKey =
                     NormalizeModeKey(loaded.SelectedModeKey);
                 loaded.RearButtons = (loaded.RearButtons ?? new()).Normalize();
+                loaded.ButtonRemapping = (loaded.ButtonRemapping ?? new()).Normalize();
                 loaded.UsbipExecutablePath = UsbipRuntimeLocator.NormalizeExecutablePath(loaded.UsbipExecutablePath);
                 loaded.LastConnectedPro2Addresses =
                     NormalizeAddressSlots(loaded.LastConnectedPro2Addresses);
@@ -91,6 +97,7 @@ public sealed class V60UserSettings
             StickProcessingLabel = StickProcessingOption.FromLabel(StickProcessingLabel).Label;
             SelectedModeKey = NormalizeModeKey(SelectedModeKey);
             RearButtons = (RearButtons ?? new()).Normalize();
+            ButtonRemapping = (ButtonRemapping ?? new()).Normalize();
             UsbipExecutablePath = UsbipRuntimeLocator.NormalizeExecutablePath(UsbipExecutablePath);
             LastConnectedPro2Addresses = NormalizeAddressSlots(LastConnectedPro2Addresses);
             Pro2StickCalibrations = NormalizeStickCalibrations(Pro2StickCalibrations);

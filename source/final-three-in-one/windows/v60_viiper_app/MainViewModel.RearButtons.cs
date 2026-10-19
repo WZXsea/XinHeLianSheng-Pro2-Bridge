@@ -1,3 +1,4 @@
+// Modified in the enhanced fork (2026-10); see docs/LOCAL_CHANGES.md.
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -12,12 +13,12 @@ public sealed partial class MainViewModel
     private readonly HashSet<string> rearDirtyModes = new();
     private string rearEditingMode = "Xbox", rearSettingsStatus = "";
     private int selectedRearIndex;
-    public IReadOnlyList<string> RearModes { get; } = ["Xbox", "PS5", "Pro1"];
+    public IReadOnlyList<string> RearModes { get; } = ["Xbox", "PS5", "Pro1", "Pro2"];
     public string RearEditingMode
     {
         get => rearEditingMode;
         set { if (!RearModes.Contains(value) || rearEditingMode == value) return; rearEditingMode = value; RearSettingsStatus = ""; RefreshRearSelection(); OnPropertyChanged();
-            OnPropertyChanged(nameof(RearEditors)); OnPropertyChanged(nameof(SelectedRearIndex)); OnPropertyChanged(nameof(SelectedRearEditor)); OnPropertyChanged(nameof(RearDraftStatus)); }
+            OnPropertyChanged(nameof(RearEditors)); OnPropertyChanged(nameof(SelectedRearIndex)); OnPropertyChanged(nameof(SelectedRearEditor)); OnPropertyChanged(nameof(RearDraftStatus)); RefreshConfigurationProfile(); }
     }
     public ObservableCollection<RearButtonEditor> RearEditors => rearEditors[rearEditingMode];
     public int SelectedRearIndex
@@ -54,6 +55,7 @@ public sealed partial class MainViewModel
         rearEditors["Xbox"] = MakeRearEditors(false, config.Xbox);
         rearEditors["PS5"] = MakeRearEditors(true, config.Ps5);
         rearEditors["Pro1"] = MakeRearEditors(false, config.Pro1, true);
+        rearEditors["Pro2"] = MakeRearEditors(false, config.Pro2, true);
         foreach (string mode in RearModes) TrackRearDraft(mode);
         RefreshRearSelection();
         SelectRearButtonCommand = new RelayCommand(parameter =>
@@ -64,10 +66,11 @@ public sealed partial class MainViewModel
             session?.CancelRearButtons();
             foreach (var slot in pro2Slots) slot.Session?.CancelRearButtons();
             RearSettingsStatus = "已请求停止背键与 C 键；松开后重新按下可再次使用。";
+            ConfigurationStatus = RearSettingsStatus;
         });
         ResetRearButtonsCommand = new RelayCommand(_ =>
         {
-            rearEditors[RearEditingMode] = MakeRearEditors(RearEditingMode == "PS5", new(), RearEditingMode == "Pro1");
+            rearEditors[RearEditingMode] = MakeRearEditors(RearEditingMode == "PS5", new(), RearEditingMode is "Pro1" or "Pro2");
             TrackRearDraft(RearEditingMode); rearDirtyModes.Add(RearEditingMode); OnPropertyChanged(nameof(RearDraftStatus));
             RefreshRearSelection();
             OnPropertyChanged(nameof(RearEditors)); OnPropertyChanged(nameof(SelectedRearIndex)); OnPropertyChanged(nameof(SelectedRearEditor));
@@ -83,6 +86,7 @@ public sealed partial class MainViewModel
         {
             if (e.PropertyName == nameof(RearButtonEditor.IsSelected)) return;
             rearDirtyModes.Add(mode);
+            if (RearEditingMode == mode) RefreshConfigurationStatus();
             if (RearEditingMode == mode) { RearSettingsStatus = ""; OnPropertyChanged(nameof(RearDraftStatus)); }
         };
     }
@@ -104,6 +108,7 @@ public sealed partial class MainViewModel
         {
             "PS5" => userSettings.RearButtons with { Ps5 = profile },
             "Pro1" => userSettings.RearButtons with { Pro1 = profile },
+            "Pro2" => userSettings.RearButtons with { Pro2 = profile },
             _ => userSettings.RearButtons with { Xbox = profile }
         };
         config = config.Normalize();
