@@ -1,18 +1,26 @@
 # PRO2 手柄助手 · 增强版
 
-用于在 Windows 10 / 11 x64 上连接 **Nintendo Switch 2 Pro Controller（NS2 Pro）**，支持 USB 有线和 BLE 蓝牙，以及 Xbox、Pro1、Steam / Pro2、PS5 兼容输出。
+用于在 Windows 10 / 11 x64 与 macOS 上连接 **Nintendo Switch 2 Pro Controller（NS2 Pro）**，支持 USB 有线和 BLE 蓝牙，以及 Xbox、Pro1、Steam / Pro2、PS5 兼容输出。
 
 基于 [LeonChrome/XinHeLianSheng-Pro2-Bridge](https://github.com/LeonChrome/XinHeLianSheng-Pro2-Bridge) 的 v1.3.22 修改，保留原项目历史、许可证和第三方致谢。本仓库是独立维护的增强版本，未经原作者或 Nintendo 官方认证。
 
-当前程序标识：`1.3.22-local-rumble-preview`，首次增强版发行号为 `v1.3.22-enhanced.1`。
+统一桌面版本：`1.4.0-dev.1`，Windows 与 macOS 共用版本、界面、配置和业务实现。原 Windows 增强版发行号为 `v1.3.22-enhanced.1`。
 
 **[下载增强版 Windows x64](https://github.com/WZXsea/XinHeLianSheng-Pro2-Bridge/releases/download/v1.3.22-enhanced.1/PRO2ControllerAssistant-1.3.22-enhanced-win-x64.zip)** · [发行说明](https://github.com/WZXsea/XinHeLianSheng-Pro2-Bridge/releases/tag/v1.3.22-enhanced.1)
 
 请与原版 v1.3.22 的安装包区分。本发行版为预发布版本，欢迎在自己的硬件上验证并报告兼容性问题。
 
-## macOS 移植预览版
+## Windows / macOS 统一桌面版本
 
-新增原生 SwiftUI macOS 工程，提供 USB / BLE 连接层、输入监测、自定义键盘映射、短时试振和虚拟 HID 输出接口。源码、构建和验收范围见 [macOS 说明](macos/README.md)。当前预览版已完成通用包构建、13 组协议/输出回归与 USB 约 250 Hz 实测；蓝牙和游戏兼容性继续进行实机验收，系统虚拟手柄需要 Apple 对应签名授权。
+`desktop/Pro2.Desktop` 是两端共同的 Avalonia 界面。首页、震动、配置中心、设置、3D 手柄和图标直接沿用原版布局与资源；同一套 C# 业务代码处理报文、按键映射、GL/GR/C 组合/连发/顺序动作、校准和触觉转换。Windows 与 macOS 分别提供原生设备通信进程。
+
+- [共同架构、构建与同步发布](desktop/README.md)
+- [macOS 通信层、驱动与实机验证](macos/README.md)
+- [当前验证记录](macos/VALIDATION.md)
+
+版本号集中在 `desktop/Directory.Build.props`。每次提交同时构建 Windows x64、macOS Apple Silicon 和 macOS Intel；版本标签对应一个包含三个安装包的发行草稿。原 WPF 工程继续提供 Windows 平台服务与回归参考，新界面及业务修改以共享工程为入口。
+
+macOS 输入由 IOKit / CoreBluetooth 接入。系统虚拟输出目前接入官方 Virtual HID Broker，支持 Xbox、Pro1 和 DualSense profile；其系统服务和机器许可证需按官方流程安装激活，Pro2 原生虚拟身份保留专用后端入口。当前硬件证据为 USB 约 250 Hz；BLE 与游戏反馈以实机验收记录为准。
 
 ## Windows 增强功能
 
@@ -42,15 +50,16 @@
 
 ## 构建与检查
 
-主要程序：`source/final-three-in-one/windows/v60_viiper_app`。在 Windows x64 安装 .NET 8 SDK 后，从仓库根目录运行：
+使用仓库 `global.json` 指定的 .NET 8 SDK；Mac 原生服务另需 Apple Command Line Tools 或 Xcode。
 
-```powershell
-dotnet publish source/final-three-in-one/windows/v60_viiper_app/Y700Switch2V60Viiper.csproj -c Release -p:PureSoftwareRelease=true -o artifacts/pure-software
-
-dotnet run --project source/final-three-in-one/tools/tests/pure_software_core_test/PureSoftwareCoreTest.csproj -c Release -p:PureSoftwareRelease=true -- artifacts/qa-results --rumble-preview-only
+```bash
+dotnet run --project desktop/Pro2.Core.Tests -c Release
+bash scripts/build-desktop.sh osx-arm64
+bash scripts/build-desktop.sh osx-x64
+bash scripts/build-desktop.sh win-x64
 ```
 
-替换最后一个参数为 `--usb-battery-only`、`--ui-only` 或 `--motion-only` 可运行对应检查。完整构建和后端说明见 [源码说明](source/final-three-in-one/README.md)。
+Mac 包在 macOS 构建；Windows 包可在 Windows Git Bash 或 macOS 交叉构建。完整验证入口与产物路径见 [统一桌面工程](desktop/README.md)。原 WPF 工程的历史构建方式保留于 [源码说明](source/final-three-in-one/README.md)。
 
 ## 来源与许可
 

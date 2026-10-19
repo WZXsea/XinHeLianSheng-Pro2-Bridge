@@ -43,6 +43,10 @@ public struct Pro2MotionSample: Sendable, Equatable {
     /// Signed raw sensor counts, before factory or stationary bias calibration.
     public let accelX: Int16, accelY: Int16, accelZ: Int16
     public let gyroX: Int16, gyroY: Int16, gyroZ: Int16
+    public init(accelX: Int16, accelY: Int16, accelZ: Int16, gyroX: Int16, gyroY: Int16, gyroZ: Int16) {
+        self.accelX = accelX; self.accelY = accelY; self.accelZ = accelZ
+        self.gyroX = gyroX; self.gyroY = gyroY; self.gyroZ = gyroZ
+    }
 }
 
 public struct Pro2Battery: Sendable, Equatable {

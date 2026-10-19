@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12</LangVersion>
+    <DefineConstants>$(DefineConstants);PURE_SOFTWARE_RELEASE</DefineConstants>
+    <AssemblyName>Pro2.Core</AssemblyName>
+    <RootNamespace>Pro2.Core</RootNamespace>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <Import Project="OriginalSharedSources.props" />
+</Project>

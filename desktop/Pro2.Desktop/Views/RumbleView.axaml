@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="using:Pro2.Desktop.Controls" x:Class="Pro2.Desktop.Views.RumbleView" x:CompileBindings="False">
+<ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,0,4,0">
+                        <Border Classes="card">
+                            <StackPanel>
+                                <DockPanel><TextBlock Text="{Binding RumblePercentText}" DockPanel.Dock="Right" FontWeight="SemiBold" /><TextBlock Text="震动强度" FontSize="23" FontWeight="SemiBold" /></DockPanel>
+                                <Slider Name="RumbleStrengthSlider" Minimum="0" Maximum="300" Value="{Binding RumblePercent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,18,0,4" AutomationProperties.Name="震动强度" TickFrequency="10" IsSnapToTickEnabled="True" />
+                                <DockPanel Margin="8,0,8,12"><TextBlock Text="300%" DockPanel.Dock="Right" Classes="muted" /><TextBlock Text="0% · 关闭" Classes="muted" /></DockPanel>
+                                <DockPanel><Button Content="试振" Command="{Binding PreviewRumbleCommand}" IsEnabled="{Binding CanPreviewRumble}" DockPanel.Dock="Right" Margin="12,0,0,0" Padding="18,8" />
+                                    <TextBlock Text="{Binding RumblePreviewHint}" VerticalAlignment="Center" Classes="muted" />
+                                </DockPanel>
+                                <TextBlock Text="游戏反馈" Margin="0,16,0,0" Classes="muted" />
+                                <TextBlock Text="{Binding CompactHapticSource}" FontSize="15" Margin="0,7,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+</UserControl>

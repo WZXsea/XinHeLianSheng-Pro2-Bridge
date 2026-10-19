@@ -18,6 +18,7 @@ public final class Pro2USBTransport: Pro2InputTransport {
     public var onReport: ((Data) -> Void)?
     public var onStatus: ((String) -> Void)?
     public var onDevices: (([Pro2TransportDevice]) -> Void)?
+    public var onPrimaryReport: ((Data) -> Void)?
     private var manager: IOHIDManager?
     private var devices: [String: IOHIDDevice] = [:]
     private var selected: IOHIDDevice?
@@ -29,6 +30,9 @@ public final class Pro2USBTransport: Pro2InputTransport {
     private var initialization: USBInitializationToken?
     private var receivedInput = false
     private var ready = false
+    private var batteryCapture = false
+    private var batteryRestore = false
+    private var batteryTimeout: DispatchWorkItem?
     private var watchdog: DispatchSourceTimer?
     private var lastInput: TimeInterval = 0
     private let commands = DispatchQueue(label: "pro2.usb.commands")
@@ -97,13 +101,19 @@ public final class Pro2USBTransport: Pro2InputTransport {
         IOHIDDeviceRegisterInputReportCallback(device, buffer, 128, { context, result, sender, _, reportID, report, length in
             guard let context, result == kIOReturnSuccess else { return }
             let owner = Unmanaged<Pro2USBTransport>.fromOpaque(context).takeUnretainedValue()
-            guard let sender, let selected = owner.selected, owner.ready, reportID == 5 else { return }
+            guard let sender, let selected = owner.selected, owner.ready, reportID == 5 || reportID == 9 else { return }
             let source = Unmanaged<IOHIDDevice>.fromOpaque(sender).takeUnretainedValue()
             guard CFEqual(selected, source) else { return }
             var data = Data(bytes: report, count: length)
             // IOHIDDevice callbacks expose complete reports on macOS; account for hosts
             // returning a payload without its ID only when exactly 63 bytes arrived.
-            if data.count == 63 { data.insert(5, at: 0) }
+            if data.count == 63 { data.insert(UInt8(reportID), at: 0) }
+            if reportID == 9, owner.batteryCapture, data.count == 64, data.first == 9 {
+                let power = data[2], level = (power >> 2) & 15
+                if level <= 9 { owner.onPrimaryReport?(Data(data.dropFirst())); owner.restoreCommonReport() }
+                return
+            }
+            guard !owner.batteryCapture else { return }
             guard data.count == 64, data.first == 5 else { return }
             if !owner.receivedInput { owner.receivedInput = true; owner.startWatchdog(); owner.onConnectionChanged?(true); owner.onStatus?("USB report 05 输入已就绪。") }
             owner.lastInput = ProcessInfo.processInfo.systemUptime
@@ -128,7 +138,8 @@ public final class Pro2USBTransport: Pro2InputTransport {
                     self.closeSelected(); return
                 }
                 self.ready = true
-                self.onStatus?("USB 初始化完成，等待 report 05 输入。")
+                self.onStatus?("USB 初始化完成，读取连接电量。")
+                self.refreshBattery()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
                     guard let self, self.session == currentSession, !self.receivedInput else { return }
                     self.onStatus?("USB 首帧超时；请重新插接手柄。")
@@ -145,18 +156,54 @@ public final class Pro2USBTransport: Pro2InputTransport {
         }
         if status != kIOReturnSuccess { onStatus?("USB 震动写入错误：\(hex(status))") }
     }
+    /// Call only before gameplay or after the owner verifies five seconds of idle input.
+    public func refreshBattery() {
+        guard selected != nil, ready, !batteryCapture, let location = desiredLocation else { return }
+        batteryCapture = true; batteryRestore = false
+        let generation = session
+        commands.async { [weak self] in
+            let result = pro2_usb_select_input_report(location, 9, nil)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.session == generation, self.batteryCapture else { return }
+                if result != kIOReturnSuccess { self.onStatus?("USB 电量请求：\(self.hex(result))"); self.restoreCommonReport(); return }
+                let timeout = DispatchWorkItem { [weak self] in self?.restoreCommonReport() }
+                self.batteryTimeout = timeout
+                DispatchQueue.main.asyncAfter(deadline:.now()+0.75,execute:timeout)
+            }
+        }
+    }
+    private func restoreCommonReport() {
+        guard batteryCapture, !batteryRestore, let location = desiredLocation else { return }
+        batteryRestore = true; batteryTimeout?.cancel(); batteryTimeout = nil
+        let generation = session
+        commands.async { [weak self] in
+            let result = pro2_usb_select_input_report(location, 5, nil)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.session == generation else { return }
+                self.batteryTimeout?.cancel(); self.batteryTimeout = nil
+                self.batteryCapture = false; self.batteryRestore = false
+                if result == kIOReturnSuccess { self.onStatus?("USB 电量采样结束，持续 report 05 已恢复。") }
+                else { self.onStatus?("USB 持续输入恢复：\(self.hex(result))，请重新连接。"); self.closeSelected() }
+            }
+        }
+    }
     private func startWatchdog() {
         lastInput = ProcessInfo.processInfo.systemUptime
         let source = DispatchSource.makeTimerSource(queue: .main)
         source.schedule(deadline: .now() + 1, repeating: 1)
         source.setEventHandler { [weak self] in
-            guard let self, ProcessInfo.processInfo.systemUptime - self.lastInput > 3 else { return }
+            guard let self, !self.batteryCapture, ProcessInfo.processInfo.systemUptime - self.lastInput > 3 else { return }
             self.onStatus?("USB 输入中断超过 3 秒，请重新插接手柄。")
             self.closeSelected()
         }
         watchdog = source; source.resume()
     }
     private func closeSelected() {
+        batteryTimeout?.cancel(); batteryTimeout = nil
+        if batteryCapture, let location = desiredLocation {
+            commands.async { _ = pro2_usb_select_input_report(location, 5, nil) }
+        }
+        batteryCapture = false; batteryRestore = false
         initialization?.cancel()
         initialization = nil
         watchdog?.cancel(); watchdog = nil
@@ -170,7 +217,7 @@ public final class Pro2USBTransport: Pro2InputTransport {
         selected = nil; selectedID = nil
     }
     public func disconnect() {
-        desiredID = nil; desiredLocation = nil; closeSelected()
+        closeSelected(); desiredID = nil; desiredLocation = nil
     }
     public func stop() {
         disconnect()

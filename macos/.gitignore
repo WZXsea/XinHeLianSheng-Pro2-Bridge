@@ -2,3 +2,4 @@
 .swiftpm/
 dist/
 *.dSYM/
+Vendor/libvirtualhid/lib/libPro2BrokerShim.dylib

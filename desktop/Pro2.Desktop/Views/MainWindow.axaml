@@ -1,0 +1,36 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:Pro2.Desktop.Views" xmlns:controls="using:Pro2.Desktop.Controls"
+        x:Class="Pro2.Desktop.Views.MainWindow" x:CompileBindings="False"
+        Title="PRO2 手柄助手" Width="1040" Height="820" MinWidth="720" MinHeight="560"
+        WindowStartupLocation="CenterScreen" Background="#080C17" Foreground="#E7EEFF"
+        FontFamily="{StaticResource NeonFont}" FontSize="14" UseLayoutRounding="True">
+  <Grid>
+    <controls:NeonAmbience/>
+    <Grid Margin="22,16,22,12" RowDefinitions="Auto,*,Auto">
+      <Grid Margin="0,0,0,14" ColumnDefinitions="*,Auto">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Border Background="#1C293C" BorderBrush="{StaticResource NeonSpectrum}" BorderThickness="1" CornerRadius="10" Width="36" Height="36" Margin="0,0,12,0">
+            <TextBlock Text="P" Foreground="White" FontWeight="Bold" FontSize="21" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <TextBlock Text="PRO2 手柄助手" FontWeight="SemiBold" FontSize="19" VerticalAlignment="Center"/>
+        </StackPanel>
+        <Border Grid.Column="1" CornerRadius="16" Background="#162734" BorderBrush="#335668" BorderThickness="1" Padding="13,7" VerticalAlignment="Center">
+          <StackPanel ToolTip.Tip="{Binding ActiveInputTransportHint}">
+            <TextBlock Text="{Binding ActiveInputTransportText}" FontSize="12" Foreground="#9CE9DA" FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding CompactStateText}" FontSize="10" Foreground="#8EB9BD" Margin="0,2,0,0"/>
+          </StackPanel>
+        </Border>
+      </Grid>
+      <TabControl Name="MainTabs" Grid.Row="1" SelectedIndex="{Binding SelectedPage, Mode=TwoWay}">
+        <TabItem Header="手柄" AutomationProperties.Name="手柄"><views:HomeView/></TabItem>
+        <TabItem Header="震动" AutomationProperties.Name="震动"><views:RumbleView/></TabItem>
+        <TabItem Header="配置中心" AutomationProperties.Name="手柄测试与按键配置中心"><views:ConfigurationCenterView/></TabItem>
+        <TabItem Header="设置" AutomationProperties.Name="设置"><views:SettingsView/></TabItem>
+      </TabControl>
+      <DockPanel Grid.Row="2" Margin="0,18,0,0">
+        <Button DockPanel.Dock="Right" Command="{Binding OpenEnvironmentCommand}" Content="{Binding AppVersion}" Padding="5,2" Margin="0" Background="Transparent" BorderBrush="Transparent" FontSize="12" Foreground="{StaticResource Muted}" ToolTip.Tip="版本与设备信息"/>
+        <TextBlock Text="纯软件 · 无需外置接收器" Classes="muted"/>
+      </DockPanel>
+    </Grid>
+  </Grid>
+</Window>

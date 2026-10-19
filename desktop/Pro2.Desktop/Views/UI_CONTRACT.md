@@ -1,0 +1,221 @@
+# Shared UI binding contract
+
+All roots use reflection bindings against Pro2.Desktop.ViewModels.MainViewModel. Original Windows property aliases are retained so the original XAML structure remains source faithful.
+
+## All XAML binding paths
+- `Action`
+- `ActiveInputTransportHint`
+- `ActiveInputTransportText`
+- `ActualOutputSummary`
+- `AddStepCommand`
+- `AddressDetail`
+- `AdvancedEditorExpanded`
+- `AppVersion`
+- `AutoOptimizeBle`
+- `AutoReconnectOnStartupEnabled`
+- `BehaviorHint`
+- `BleConnectionTitle`
+- `BleOptimizationSummary`
+- `BleStabilitySummary`
+- `BluetoothRestartStatus`
+- `Busy`
+- `CalibrateSourceGyroCommand`
+- `CalibrateStickCenterSlotCommand`
+- `CalibrateStickRangeSlotCommand`
+- `CanChangeBleOptimizationSettings`
+- `CanConfigureWin10Stack`
+- `CanManageRuntime`
+- `CanOperate`
+- `CanPreviewRumble`
+- `CanTryWin11Compatibility`
+- `CancelConnectionCommand`
+- `CancelRearButtonsCommand`
+- `Choices`
+- `CleanupStaleVirtualDevicesCommand`
+- `ClearLogCommand`
+- `ClearSeenCommand`
+- `CloseKeyEditorCommand`
+- `CompactActualMode`
+- `CompactBatteryHint`
+- `CompactBatteryVisual.Caption`
+- `CompactBatteryVisual.Level`
+- `CompactBatteryVisual.Segments`
+- `CompactCanConnect`
+- `CompactCanStop`
+- `CompactConnectText`
+- `CompactFirmware`
+- `CompactFirmwareHint`
+- `CompactHapticSource`
+- `CompactHeadset`
+- `CompactInputAge`
+- `CompactInputRate`
+- `CompactParsedRate`
+- `CompactPs5Selected`
+- `CompactRawRate`
+- `CompactStateText`
+- `CompactStopCommand`
+- `CompatibilityGuidance`
+- `CompatibilityTitle`
+- `ConfidenceText`
+- `ConfigurationDraftStatus`
+- `ConfigurationKeys`
+- `ConfigurationMode`
+- `ConfigurationModeLabel`
+- `ConfigurationStatus`
+- `ConfigureBluetoothCommand`
+- `ConnectPro2InputCommand`
+- `CopyDiagnosisCommand`
+- `CopyEnvironmentCommand`
+- `DataContext.ConnectDeviceCommand`
+- `DataContext.ConnectPro2SlotCommand`
+- `DataContext.DisconnectPro2SlotCommand`
+- `DelayMS`
+- `Devices`
+- `DisableSelectedControlCommand`
+- `DisconnectPro2InputCommand`
+- `DriverPathActionText`
+- `Enabled`
+- `EnvironmentHomeSummaryHint`
+- `EnvironmentInfoStatus`
+- `EnvironmentReportText`
+- `Evidence`
+- `ExportDiagnosticsLogCommand`
+- `Fill`
+- `First`
+- `Foreground`
+- `GapMS`
+- `HasBluetoothRestartStatus`
+- `HasLowRateWarning`
+- `HasOutput`
+- `HomeBatteryStatus`
+- `HomeConnectionHint`
+- `HomeInputSummary`
+- `HomeLowRateHint`
+- `HomeModeDescription`
+- `HomeOutputLabel`
+- `HomeSessionSummary`
+- `Id`
+- `Index`
+- `InputStatus`
+- `InputTransportOptions`
+- `InstallUsbipCommand`
+- `IsKeyEditorOpen`
+- `IsPro1Selected`
+- `IsPro2Selected`
+- `IsRearKeySelected`
+- `IsRepeat`
+- `IsSequence`
+- `IsStandardKeySelected`
+- `IsTimed`
+- `IsWindows`
+- `IsXboxSelected`
+- `Label`
+- `LaunchAtLoginEnabled`
+- `LetterLayoutCommand`
+- `LogText`
+- `LowRateAdvice`
+- `LowRateEnvironmentSummary`
+- `LowRateEvidence`
+- `LowRateMeasuredSummary`
+- `LowRateSummary`
+- `LowRateTitle`
+- `MappingSummary`
+- `Name`
+- `OpenBackendLicenseCommand`
+- `OpenConfigurationCommand`
+- `OpenEnvironmentCommand`
+- `OpenManualConnectCommand`
+- `OptimizeBluetoothCommand`
+- `PositionLayoutCommand`
+- `PressMS`
+- `PreviewRumbleCommand`
+- `Pro2Slots`
+- `Ps5GyroScale`
+- `Ps5GyroScaleText`
+- `QuickTargets`
+- `RefreshEnvironmentCommand`
+- `RefreshSteamCacheCommand`
+- `RemoveCommand`
+- `RepeatCount`
+- `ResetConfigurationCommand`
+- `ResetUsbipPathCommand`
+- `RestartBluetoothCommand`
+- `RestoreBluetoothCommand`
+- `RestoreSelectedControlCommand`
+- `RumblePercent`
+- `RumblePercentText`
+- `RumblePreviewHint`
+- `RunWin10BleDiagnosticCommand`
+- `RuntimeBatteryRefreshEnabled`
+- `RuntimeReadinessText`
+- `SaveConfigurationCommand`
+- `SaveEnvironmentCommand`
+- `SearchCommand`
+- `Second`
+- `SeenButtons`
+- `SelectBackendPathCommand`
+- `SelectCompactModeCommand`
+- `SelectControlCommand`
+- `Selected`
+- `SelectedConfigurationKey.Label`
+- `SelectedControl`
+- `SelectedInputTransport`
+- `SelectedPage`
+- `SelectedRearEditor`
+- `SelectedSlot`
+- `SelectedStickProcessing`
+- `SelectedWin10BlePreset`
+- `SelectedXInputIndex`
+- `ShowBleOptimizationSummary`
+- `ShowDiagnostics`
+- `ShowWin10BleHomeAction`
+- `ShowWin10BleHomePanel`
+- `ShowWin11CompatibilityAction`
+- `SignalText`
+- `SkipUsbBleInitialization`
+- `State`
+- `Status`
+- `Steps`
+- `StickProcessingChoices`
+- `TestAxes`
+- `TestGap`
+- `TestOutputSummary`
+- `TestProcessing`
+- `TestRate`
+- `TestStatus`
+- `TestTiming`
+- `TestTriggers`
+- `Title`
+- `ToggleWindowsBluetoothPanelCommand`
+- `UsbipLocationText`
+- `Win10BleHomeHint`
+- `Win10BlePresetOptions`
+- `Win10BlePresetSafetyNote`
+
+## Configuration contract
+DTO classes are implemented in `Views/ViewChoices.cs`; runtime and persistence are owned by the main view model.
+
+- `State`: shared `Y700Switch2V60Viiper.GamepadState`; `SeenButtons`: shared `GamepadButtons`; controls use original stable button bit order 0..20.
+- `ConfigurationKeys`: `IReadOnlyList<ConfigurationKeyRow>`; row properties: Index, Label, Summary, Pressed, Seen, Selected, Customized. An ObservableCollection also satisfies this interface.
+- `SelectedControl`: int; `SelectedConfigurationKey`: the selected ConfigurationKeyRow.
+- `QuickTargets`: `ObservableCollection<TargetChoice>`; properties Index(int), Label(string), Selected(bool).
+- `SelectedRearEditor`: `RearActionDraft` for GL/GR/C; Enabled(bool), Action(string: follow/tap/turbo/sequence/disabled), DelayMS/PressMS/GapMS/RepeatCount(int), Targets(ObservableCollection<TargetChoice>), Steps(ObservableCollection<SequenceStepRow>). Computed IsTimed/IsRepeat/IsSequence/HasOutput/BehaviorHint/MappingSummary and AddStepCommand are supplied.
+- `SequenceStepRow`: First/Second(int target index, -1 for none), DelayMS/PressMS(int), Choices(IReadOnlyList<TargetChoice>), RemoveCommand(ICommand).
+- ConfigurationMode lower-case key pro2/pro1/xbox/dualsense; ConfigurationModeLabel original display name; ConfigurationDraftStatus, ConfigurationStatus.
+- IsKeyEditorOpen, AdvancedEditorExpanded, IsStandardKeySelected, IsRearKeySelected(bool).
+- TestStatus, TestRate, TestGap, TestOutputSummary, TestTiming, TestAxes, TestTriggers, TestProcessing(string); SelectedSlot(int 0..3).
+- SelectControlCommand accepts int; ChooseTargetCommand accepts `ChooseOutputRequest(Index:int,Multiple:bool)`; CloseKeyEditorCommand, RestoreSelectedControlCommand, DisableSelectedControlCommand, ClearSeenCommand, LetterLayoutCommand, PositionLayoutCommand, CancelRearButtonsCommand, ResetConfigurationCommand, SaveConfigurationCommand.
+- ManualConnectWindow uses Devices(ControllerDevice Id/Name/Transport, SignalText, ConfidenceText, AddressDetail, Evidence), SearchCommand, ConnectDeviceCommand(parameter ControllerDevice).
+- EnvironmentInfoWindow uses EnvironmentInfoStatus, EnvironmentReportText, RefreshEnvironmentCommand, CopyEnvironmentCommand, SaveEnvironmentCommand.
+
+## Shared assets
+Resource URIs use `avares://PRO2ControllerAssistant/Assets/Controller/ns2pro-shell.mesh` and `.../switch2-official-mark.svg`. The shared csproj links the Windows Assets directory; both platforms load exactly the same N2M1 data and original SVG mark.
+
+## Additional acceptance interfaces
+- SlotRow.EnabledChanged: optional Action<bool> callback, invoked only after the checkbox state changes.
+- AppVersion: shared desktop build version used by the footer.
+- Windows input detail controls: IsWindows(bool), SelectedXInputIndex(int 0..3), ActualOutputSummary(string from OS readback).
+- Shared embedded typeface: single-source Windows Assets/Fonts/NotoSansSC-{Regular,Medium,Bold}.otf with original OFL.txt and ASSET-SOURCES.md; resource URI `avares://PRO2ControllerAssistant/Assets/Fonts#Noto Sans SC`.
+- PS5 gyro scaling range is 0.1 through 4.0; rumble scaling remains 0 through 300 percent.
+- Desktop.Tests uses MainViewModel(initialize:false) and Avalonia.Headless/Skia to render source artifacts without opening physical device connections.
+- Desktop.Tests/ConfigurationValidation.cs exercises original configuration rules, rejected-save preservation and all four modes' face layouts on the UI thread. Accepted profiles are built in memory; the suite verifies the settings file and committed settings remain unchanged.

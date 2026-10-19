@@ -65,7 +65,7 @@ public sealed class V60UserSettings
                     NormalizeModeKey(loaded.SelectedModeKey);
                 loaded.RearButtons = (loaded.RearButtons ?? new()).Normalize();
                 loaded.ButtonRemapping = (loaded.ButtonRemapping ?? new()).Normalize();
-                loaded.UsbipExecutablePath = UsbipRuntimeLocator.NormalizeExecutablePath(loaded.UsbipExecutablePath);
+                loaded.UsbipExecutablePath = SettingsPathNormalization.NormalizeUsbipExecutablePath(loaded.UsbipExecutablePath);
                 loaded.LastConnectedPro2Addresses =
                     NormalizeAddressSlots(loaded.LastConnectedPro2Addresses);
                 loaded.Pro2StickCalibrations =
@@ -98,7 +98,7 @@ public sealed class V60UserSettings
             SelectedModeKey = NormalizeModeKey(SelectedModeKey);
             RearButtons = (RearButtons ?? new()).Normalize();
             ButtonRemapping = (ButtonRemapping ?? new()).Normalize();
-            UsbipExecutablePath = UsbipRuntimeLocator.NormalizeExecutablePath(UsbipExecutablePath);
+            UsbipExecutablePath = SettingsPathNormalization.NormalizeUsbipExecutablePath(UsbipExecutablePath);
             LastConnectedPro2Addresses = NormalizeAddressSlots(LastConnectedPro2Addresses);
             Pro2StickCalibrations = NormalizeStickCalibrations(Pro2StickCalibrations);
             Ps5GyroScalePitch = NormalizePs5GyroScale(Ps5GyroScalePitch);

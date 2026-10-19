@@ -5,6 +5,38 @@ import Pro2Output
 import GameController
 
 let args = CommandLine.arguments
+if args.contains("--probe-ble") {
+    setbuf(stdout,nil)
+    let ble = Pro2BLETransport()
+    var attempt = false
+    var frames = 0
+    var phase: Pro2BLEPhase?
+    ble.onStatus = { print("BLE \($0)") }
+    ble.onDevices = { devices in
+        print("ble_candidates=\(devices.count)")
+        if !attempt, let candidate = devices.first { attempt = true; DispatchQueue.main.async { ble.connect(to:candidate.id) } }
+    }
+    ble.onConnectionChanged = { print("ble_connected=\($0)") }
+    ble.onDiagnostics = { value in
+        if phase != value.phase { phase = value.phase; print("phase=\(value.phase.rawValue) error=\(value.lastError)") }
+        if value.phase == .ready { print("BLE input_frames=\(value.receivedFrames) measured_hz=\(value.measuredHz)") }
+    }
+    ble.onReport = { data in
+        if let state = try? Pro2ReportParser().parse(data,format:.fd2) {
+            frames += 1
+            if frames == 1 { print("first_fd2_bytes=\(data.count) buttons=\(state.buttons.rawValue) axes=\(state.rawAxes)") }
+        }
+    }
+    ble.startDiscovery()
+    var stopFile: String?
+    if let i = args.firstIndex(of:"--until-file"), args.count > i+1 { stopFile = args[i+1] }
+    print("BLE continuous_probe_started=true")
+    let limit = Date(timeIntervalSinceNow:3600)
+    while Date() < limit && !(stopFile.map { FileManager.default.fileExists(atPath:$0) } ?? false) {
+        RunLoop.main.run(until:Date(timeIntervalSinceNow:1))
+    }
+    ble.stop(); print("BLE SUMMARY valid_frames=\(frames)"); exit(frames > 0 ? 0 : 3)
+}
 if args.contains("--native-controllers") {
     RunLoop.main.run(until:Date(timeIntervalSinceNow:2))
     for c in GCController.controllers() { print("native_controller=\(c.vendorName ?? "unknown") category=\(c.productCategory) extended=\(c.extendedGamepad != nil)") }

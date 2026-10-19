@@ -1,0 +1,134 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="using:Pro2.Desktop.Controls" xmlns:views="using:Pro2.Desktop.Views" x:Class="Pro2.Desktop.Views.SettingsView" x:CompileBindings="False">
+<ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,0,4,0">
+                        <Border Padding="16" Classes="card">
+                            <StackPanel>
+                                <TextBlock Text="虚拟手柄驱动" FontWeight="SemiBold" FontSize="17" Margin="0,0,0,6" />
+                                <TextBlock Text="{Binding UsbipLocationText}" TextWrapping="Wrap" Classes="muted" />
+                                <TextBlock Text="{Binding RuntimeReadinessText}" TextWrapping="Wrap" Margin="0,4,0,4" Classes="muted" />
+                                <WrapPanel IsEnabled="{Binding CanManageRuntime}">
+                                    <Button Content="{Binding DriverPathActionText}" Command="{Binding SelectBackendPathCommand}" />
+                                    <Button Content="自动查找" Command="{Binding ResetUsbipPathCommand}" />
+                                    <Button Content="安装 / 修复驱动" Command="{Binding InstallUsbipCommand}" />
+                                    <Button Content="驱动授权…" Command="{Binding OpenBackendLicenseCommand}" IsVisible="{x:Static views:ViewChoices.IsMacOS}" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Padding="16" Classes="card">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,12">
+                                    <Button Content="系统与蓝牙信息…" DockPanel.Dock="Right" Padding="12,6" Margin="0" Command="{Binding OpenEnvironmentCommand}" />
+                                    <ComboBox DockPanel.Dock="Right" Width="190" Margin="0,0,12,0" ItemsSource="{Binding InputTransportOptions}" SelectedItem="{Binding SelectedInputTransport}" IsEnabled="{Binding CanManageRuntime}" AutomationProperties.Name="手柄连接方式" ToolTip.Tip="下次连接生效。切换前请先停止连接；自动模式优先使用数据线。" />
+                                    <TextBlock Text="设置" FontSize="23" FontWeight="SemiBold" />
+                                </DockPanel>
+                                <WrapPanel>
+                                    <CheckBox Content="登录系统时自动启动" IsChecked="{Binding LaunchAtLoginEnabled}" Margin="0,0,28,12" />
+                                    <CheckBox Content="启动后自动进入上次使用的模式" IsChecked="{Binding AutoReconnectOnStartupEnabled}" />
+                                </WrapPanel>
+                                <WrapPanel>
+                                    <CheckBox Content="定期更新电量" IsChecked="{Binding RuntimeBatteryRefreshEnabled}" Margin="0,0,28,0" ToolTip.Tip="USB 约每5分钟在连续空闲5秒后短暂采样，蓝牙约每10分钟更新。操作时延后，异常时暂停并保留上次读取值。" />
+                                    <CheckBox Content="低速时自动优化蓝牙" IsChecked="{Binding AutoOptimizeBle}" IsEnabled="{Binding CanChangeBleOptimizationSettings}" ToolTip.Tip="Win11 在当前连接内自动尝试有限预设，跨适配器型号和驱动版本开放；Win10 全局参数必须单独确认和管理员授权，不会静默轮换。" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Padding="16" Classes="card">
+                            <StackPanel IsEnabled="{Binding CanOperate}">
+                                <TextBlock Text="校准与连接" FontWeight="SemiBold" FontSize="17" Margin="0,0,0,8" />
+                                <WrapPanel>
+                                    <Button Content="摇杆零位校准" Command="{Binding CalibrateStickCenterSlotCommand}" CommandParameter="1" />
+                                    <Button Content="摇杆行程校准" Command="{Binding CalibrateStickRangeSlotCommand}" CommandParameter="1" />
+                                    <Button Content="陀螺仪校准" Command="{Binding CalibrateSourceGyroCommand}" />
+                                    <Button Content="断开真实手柄" Command="{Binding DisconnectPro2InputCommand}" />
+                                    <Button Content="蓝牙设置…" Command="{Binding RestartBluetoothCommand}" ToolTip.Tip="打开当前系统的蓝牙设置，管理适配器和手柄配对。" />
+                                </WrapPanel>
+                                <TextBlock Text="零位：松开摇杆2秒 · 行程：沿外圈转动8秒 · 陀螺仪：静置3秒" Classes="muted" />
+                                <TextBlock Text="{Binding BluetoothRestartStatus}" TextWrapping="Wrap" Margin="0,8,0,0" Classes="muted" IsVisible="{Binding HasBluetoothRestartStatus}" />
+                                <Expander Header="更多手柄 · Steam / Xbox" Margin="0,16,0,0">
+                                    <ItemsControl ItemsSource="{Binding Pro2Slots}">
+                                        <ItemsControl.ItemTemplate><DataTemplate>
+                                            <StackPanel Margin="0,12,0,8">
+                                                <DockPanel>
+                                                    <CheckBox Content="{Binding Name}" IsChecked="{Binding Enabled}" DockPanel.Dock="Left" Margin="0,0,16,0" />
+                                                    <TextBlock Text="{Binding Status}" Classes="muted" />
+                                                </DockPanel>
+                                                <WrapPanel Margin="0,6,0,0">
+                                                    <Button Content="连接" Command="{Binding DataContext.ConnectPro2SlotCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Index}" />
+                                                    <Button Content="断开" Command="{Binding DataContext.DisconnectPro2SlotCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Index}" />
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </DataTemplate></ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Expander>
+                            </StackPanel>
+                        </Border>
+                        <Expander Header="高级设置与诊断" IsExpanded="{Binding ShowDiagnostics}" Padding="0,4">
+                            <StackPanel>
+                        <Border Background="#302A21" BorderBrush="#7B643F" BorderThickness="1" CornerRadius="12" Padding="10" Margin="0,0,0,14" IsVisible="{Binding HasLowRateWarning}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding LowRateTitle}" Foreground="#E8C48B" FontSize="13" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding BleOptimizationSummary}" Foreground="#E8C48B" FontSize="12" Margin="0,4,0,0" IsVisible="{Binding ShowBleOptimizationSummary}" />
+                                <TextBlock Text="{Binding LowRateMeasuredSummary}" Foreground="#E8C48B" FontSize="12" Margin="0,4,0,0" />
+                                <Expander Header="原因待定位 · 依据、建议与导出" FontSize="12" Foreground="#C6AB83" Margin="0,6,0,0">
+                                    <StackPanel Margin="0,8,0,0">
+                                <TextBlock Text="{Binding LowRateEnvironmentSummary}" Foreground="#C6AB83" FontSize="11" Margin="0,3,0,0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding EnvironmentHomeSummaryHint}" />
+                                <TextBlock Text="{Binding LowRateSummary}" Foreground="#C6AB83" FontSize="12" Margin="0,5,0,0" />
+
+                                        <TextBlock Text="{Binding LowRateAdvice}" Foreground="#C6AB83" FontSize="12" />
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <Button Content="复制诊断" Padding="10,5" Margin="0,0,8,4" FontSize="12" Command="{Binding CopyDiagnosisCommand}" />
+                                            <Button Content="信息 / 导出…" Padding="10,5" Margin="0,0,8,4" FontSize="12" Command="{Binding OpenEnvironmentCommand}" />
+                                            <Button Content="自动优化蓝牙…" Padding="10,5" Margin="0,0,8,4" FontSize="12" IsEnabled="{Binding CanTryWin11Compatibility}" Command="{Binding OptimizeBluetoothCommand}" IsVisible="{Binding ShowWin11CompatibilityAction}" />
+                                        </WrapPanel>
+                                        <TextBox Text="{Binding LowRateEvidence, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" Height="140" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,8,0,0" BorderThickness="0" Background="Transparent" Foreground="#D8C49F" FontSize="11" />
+                                    </StackPanel>
+                                </Expander>
+                            </StackPanel>
+                        </Border>
+
+                                <Border Margin="0,12,0,12" Classes="card">
+                                    <StackPanel>
+                                        <TextBlock Text="连接信息" FontWeight="SemiBold" FontSize="17" Margin="0,0,0,14" />
+                                        <TextBlock Text="{Binding CompactFirmware, StringFormat=手柄固件：{0}}" Margin="0,0,0,6" ToolTip.Tip="{Binding CompactFirmwareHint}" />
+                                        <TextBlock Text="{Binding CompactBatteryVisual.Caption}" Margin="0,0,0,6" ToolTip.Tip="{Binding CompactBatteryHint}" />
+                                        <TextBlock Text="{Binding BleStabilitySummary}" Margin="0,0,0,6" />
+                                        <TextBlock Text="{Binding Status}" Margin="0,0,0,12" Classes="muted" />
+                                        <TextBlock Text="{Binding CompatibilityTitle}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding CompatibilityGuidance}" TextWrapping="Wrap" Margin="0,6,0,12" Classes="muted" />
+                                        <TextBlock Text="关闭窗口后仍在托盘运行；窗口刷新与手柄输入分别调度。" Margin="0,0,0,12" Classes="muted" />
+                                        <TextBlock Text="{Binding CompactActualMode}" />
+                                        <TextBlock Text="{Binding InputStatus}" Margin="0,8,0,8" Classes="muted" />
+                                        <WrapPanel>
+                                            <TextBlock Text="Raw: " Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding CompactRawRate}" Margin="0,0,20,0" />
+                                            <TextBlock Text="Parsed: " Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding CompactParsedRate}" Margin="0,0,20,0" />
+                                            <TextBlock Text="最新输入年龄: " Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding CompactInputAge}" />
+                                        </WrapPanel>
+                                        <TextBlock Text="摇杆处理" Margin="0,18,0,0" />
+                                        <ComboBox ItemsSource="{Binding StickProcessingChoices}" SelectedItem="{Binding SelectedStickProcessing}" IsEnabled="{Binding CanOperate}" />
+                                        <TextBlock Text="PS5 陀螺仪倍率" />
+                                        <Slider Minimum="0.1" Maximum="4" Value="{Binding Ps5GyroScale}" Margin="0,12,0,8" />
+                                        <TextBlock Text="{Binding Ps5GyroScaleText}" Classes="muted" />
+                                        <WrapPanel IsEnabled="{Binding CanOperate}">
+                                            <Button Content="导出诊断包" Command="{Binding ExportDiagnosticsLogCommand}" />
+                                            <Button Content="BLE 实测 15 秒" Command="{Binding RunWin10BleDiagnosticCommand}" />
+                                            <Button Content="清理残留虚拟设备" Command="{Binding CleanupStaleVirtualDevicesCommand}" />
+                                            <Button Content="修复虚拟手柄驱动" Command="{Binding InstallUsbipCommand}" />
+                                            <Button Content="刷新 Steam 缓存" Command="{Binding RefreshSteamCacheCommand}" />
+                                        </WrapPanel>
+                                        <TextBlock Text="BLE 初始化对照" FontWeight="SemiBold" Margin="0,14,0,6" />
+                                        <CheckBox Content="同时跳过 USB 初始化（对照测试）" IsChecked="{Binding SkipUsbBleInitialization}" />
+                                        <TextBlock Text="默认已跳过配对提交。此开关仅影响下一次连接，不自动断开；本次程序关闭后复位。" TextWrapping="Wrap" Margin="0,6,0,0" Classes="muted" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="card">
+                                    <StackPanel>
+                                        <DockPanel><Button Content="清空显示" DockPanel.Dock="Right" Command="{Binding ClearLogCommand}" /><TextBlock Text="会话日志" FontWeight="SemiBold" VerticalAlignment="Center" /></DockPanel>
+                                        <TextBox Text="{Binding LogText, Mode=OneWay}" IsReadOnly="True" Height="180" FontFamily="{StaticResource NeonFont}" FontSize="11" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" Background="#0C1424" Foreground="#B7C6DF" BorderThickness="0" Padding="12" />
+                                        <TextBlock Text="界面日志每秒最多刷新一次；文件日志在后台异步保存。" Margin="0,10,0,0" Classes="muted" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+
+</UserControl>

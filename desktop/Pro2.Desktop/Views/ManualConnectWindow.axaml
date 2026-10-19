@@ -1,0 +1,30 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Pro2.Desktop.Views.ManualConnectWindow" x:CompileBindings="False"
+        Title="手动连接 Pro2" Width="800" Height="600" MinWidth="480" MinHeight="360"
+        WindowStartupLocation="CenterOwner" Background="#0D1425" Foreground="#E7EEFF"
+        FontFamily="{StaticResource NeonFont}" FontSize="14" UseLayoutRounding="True">
+  <Grid Margin="24" RowDefinitions="Auto,Auto,*,Auto">
+    <DockPanel>
+      <Button Content="重新扫描" Command="{Binding SearchCommand}" DockPanel.Dock="Right"/>
+      <StackPanel><TextBlock Text="手动连接" FontWeight="SemiBold" FontSize="24"/><TextBlock Text="{Binding Status}" Foreground="#95A5C1" Margin="0,6,0,0"/></StackPanel>
+    </DockPanel>
+    <TextBlock Grid.Row="1" Text="USB 与 BLE 广播设备 · 优先显示最可能的 Pro2 · 点击设备尝试连接" Foreground="#95A5C1" FontSize="12" Margin="0,18,0,12" TextWrapping="Wrap"/>
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <ItemsControl ItemsSource="{Binding Devices}" Margin="0,0,4,0"><ItemsControl.ItemTemplate><DataTemplate>
+        <Button Command="{Binding $parent[Window].DataContext.ConnectDeviceCommand}" CommandParameter="{Binding}" HorizontalContentAlignment="Stretch" Padding="16,14" Margin="0,0,0,8" AutomationProperties.Name="{Binding Name}">
+          <Grid ColumnDefinitions="*,112,76" RowDefinitions="Auto,Auto">
+            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="15" TextTrimming="CharacterEllipsis" Margin="0,0,10,0"/>
+            <TextBlock Grid.Column="1" Text="{Binding ConfidenceText}" Foreground="#9ADCCE"/>
+            <TextBlock Grid.Column="2" Text="{Binding SignalText}" Foreground="#95A5C1" HorizontalAlignment="Right"/>
+            <TextBlock Grid.Row="1" Text="{Binding AddressDetail}" Foreground="#95A5C1" FontFamily="{StaticResource NeonFont}" FontSize="12" Margin="0,8,10,0" TextWrapping="Wrap"/>
+            <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding Evidence}" Foreground="#95A5C1" FontSize="11" Margin="0,8,0,0" TextWrapping="Wrap"/>
+          </Grid>
+        </Button>
+      </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+    </ScrollViewer>
+    <Grid Grid.Row="3" Margin="0,16,0,0" ColumnDefinitions="*,Auto">
+      <TextBlock Text="{Binding Status}" TextWrapping="Wrap" LineHeight="20" Margin="0,0,16,0" VerticalAlignment="Center" Foreground="#9ADCCE"/>
+      <Button Grid.Column="1" Content="返回" Click="Return_Click" VerticalAlignment="Center"/>
+    </Grid>
+  </Grid>
+</Window>

@@ -1,0 +1,72 @@
+{
+  "name": "libvirtualhid",
+  "version": "v2026.1016.55.45",
+  "source_url": "https://github.com/LizardByte/libvirtualhid/releases/download/v2026.1016.55.45/libvirtualhid-macOS-universal.dmg",
+  "release_url": "https://github.com/LizardByte/libvirtualhid/releases/tag/v2026.1016.55.45",
+  "license_map_url": "https://github.com/LizardByte/libvirtualhid/blob/v2026.1016.55.45/LICENSES/license-map.md",
+  "release_sha256": "4df368d9a8cd7d6186527e8c811d13691dd91552620db7ac5980f62e29316e11",
+  "release_size": 5096819,
+  "extracted_from": "usr/local/{include/libvirtualhid,lib/libvirtualhid.a,share/licenses/libvirtualhid/LICENSE}",
+  "architectures": [
+    "arm64",
+    "x86_64"
+  ],
+  "minimum_macos": "14.2",
+  "broker_package_vendored": false,
+  "files": [
+    {
+      "path": "include/libvirtualhid/gamepad_adapter.hpp",
+      "size": 10079,
+      "sha256": "c240cfa93788186b7ec61d6ce5aa2913659588080f2a2be305d97fe2c4307be3",
+      "license": "MIT"
+    },
+    {
+      "path": "include/libvirtualhid/libvirtualhid.hpp",
+      "size": 387,
+      "sha256": "b2933050c86f00aa26ca6190bdf8a8b255549602b449f4d8ea2fcc5d437058cc",
+      "license": "MIT"
+    },
+    {
+      "path": "include/libvirtualhid/license.hpp",
+      "size": 3847,
+      "sha256": "9db2daa8a4519174c24bf3ca6907fe4f7c3a35ec3acb726b25ff42e31a92080a",
+      "license": "MIT"
+    },
+    {
+      "path": "include/libvirtualhid/profiles.hpp",
+      "size": 4371,
+      "sha256": "940aaf647dc7643197cdba62c8c7727a07e1636368ebaed2d9b7010aa91d40e1",
+      "license": "MIT"
+    },
+    {
+      "path": "include/libvirtualhid/report.hpp",
+      "size": 2969,
+      "sha256": "dfc2c5b6e0d3b319d757fe17e630a013ce9adc923df384a6bc8575cd685ada61",
+      "license": "MIT"
+    },
+    {
+      "path": "include/libvirtualhid/runtime.hpp",
+      "size": 28843,
+      "sha256": "a622eadc57067a310866e5d2692258c41d0aa3ae6ed8eb361f2c3c4021118d60",
+      "license": "MIT"
+    },
+    {
+      "path": "include/libvirtualhid/types.hpp",
+      "size": 28967,
+      "sha256": "18d2d776d651f14531d817b8fa11b8313784d6a90f1f317447a10ecd833ff074",
+      "license": "MIT"
+    },
+    {
+      "path": "lib/libvirtualhid.a",
+      "size": 1164560,
+      "sha256": "70ed1872bd648d7cb768ac5fd6d9114c22a47d36f750ab18350ac69f9029c691",
+      "license": "MIT"
+    },
+    {
+      "path": "licenses/MIT.md",
+      "size": 1067,
+      "sha256": "4476801c7646ac207248c10a3fdd157af47ef9a26cd5ec95c91919a625c07f2f",
+      "license": "MIT"
+    }
+  ]
+}

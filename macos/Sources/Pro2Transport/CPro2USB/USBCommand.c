@@ -30,7 +30,7 @@ static uint32_t number(io_registry_entry_t service, CFStringRef key) {
     return result;
 }
 
-int32_t pro2_usb_initialize(uint32_t location_id, Pro2USBCancellation *token) {
+static int32_t command_channel(uint32_t location_id, Pro2USBCancellation *token, uint8_t report_id) {
     if (cancelled(token)) return kIOReturnAborted;
     if (!location_id) return kIOReturnBadArgument;
     io_iterator_t iterator = 0;
@@ -78,13 +78,22 @@ int32_t pro2_usb_initialize(uint32_t location_id, Pro2USBCancellation *token) {
             {0x03,0x91,0,0x0a,0,4,0,0,5,0,0,0}
         };
         static const uint32_t lengths[] = {16,12,12,28,12};
-        for (int index = 0; index < 5; index++) {
+        const int first = report_id ? 4 : 0;
+        uint8_t select_report[] = {0x03,0x91,0,0x0a,0,4,0,0,report_id,0,0,0};
+        for (int index = first; index < 5; index++) {
             if (cancelled(token)) { status = kIOReturnAborted; break; }
-            status = (*interface)->WritePipeTO(interface, pipe, packets[index], lengths[index], 1500, 1500);
+            status = (*interface)->WritePipeTO(interface, pipe, report_id ? select_report : packets[index], lengths[index], 1500, 1500);
             if (status != kIOReturnSuccess) break;
             usleep(20000);
         }
     }
     if (interface) { (*interface)->USBInterfaceClose(interface); (*interface)->Release(interface); }
     return status;
+}
+int32_t pro2_usb_initialize(uint32_t location_id, Pro2USBCancellation *token) {
+    return command_channel(location_id, token, 0);
+}
+int32_t pro2_usb_select_input_report(uint32_t location_id, uint8_t report_id, Pro2USBCancellation *token) {
+    if (report_id != 5 && report_id != 9) return kIOReturnBadArgument;
+    return command_channel(location_id, token, report_id);
 }

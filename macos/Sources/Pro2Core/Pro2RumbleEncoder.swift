@@ -55,7 +55,12 @@ public enum Pro2RumbleEncoder {
     /// Matches Pro2OutputPacketMapper.BuildOrdinaryPacket(40,96,"slider-preview").Report.
     /// Both motors receive the same bounded preview; callers schedule its stop separately.
     public static func previewRaw02() -> [UInt8] {
-        let weak = 40, strong = 96
+        ordinaryRaw02(weak:40,strong:96)
+    }
+    /// Source BuildOrdinaryPacket: maps normalized high/low frequency feedback.
+    public static func ordinaryRaw02(weak: UInt8, strong: UInt8) -> [UInt8] {
+        if weak == 0 && strong == 0 { return neutralRaw02() }
+        let weak = Int(weak), strong = Int(strong)
         // Source integer rounding precedes the original 64-count amplitude quantization.
         let lowAmplitude = ((strong * 29000 + 127) / 255) & 0xffc0
         let highAmplitude = ((weak * 29000 + 127) / 255) & 0xffc0

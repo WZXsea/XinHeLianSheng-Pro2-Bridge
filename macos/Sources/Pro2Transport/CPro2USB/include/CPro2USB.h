@@ -9,4 +9,5 @@ Pro2USBCancellation *pro2_usb_cancellation_create(void);
 void pro2_usb_cancellation_cancel(Pro2USBCancellation *token);
 void pro2_usb_cancellation_destroy(Pro2USBCancellation *token);
 int32_t pro2_usb_initialize(uint32_t location_id, Pro2USBCancellation *token);
+int32_t pro2_usb_select_input_report(uint32_t location_id, uint8_t report_id, Pro2USBCancellation *token);
 #endif
