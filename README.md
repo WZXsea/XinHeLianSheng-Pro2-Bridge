@@ -17,6 +17,7 @@
 - [共同架构、构建与同步发布](desktop/README.md)
 - [macOS 通信层、驱动与实机验证](macos/README.md)
 - [当前验证记录](macos/VALIDATION.md)
+- [免费开源输出后端核验](docs/MACOS_FREE_BACKENDS.md)
 
 版本号集中在 `desktop/Directory.Build.props`。每次提交同时构建 Windows x64、macOS Apple Silicon 和 macOS Intel；版本标签对应一个包含三个安装包的发行草稿。原 WPF 工程继续提供 Windows 平台服务与回归参考，新界面及业务修改以共享工程为入口。
 
