@@ -1,0 +1,104 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:Pro2.Desktop.Views" xmlns:controls="using:Pro2.Desktop.Controls"
+             x:Class="Pro2.Desktop.Views.ConfigurationCenterView" x:CompileBindings="False" Foreground="#E9EFF8" FontSize="12">
+  <UserControl.Styles>
+    <Style Selector="Button"><Setter Property="Background" Value="#1C283B"/><Setter Property="Foreground" Value="#DCE7F6"/><Setter Property="BorderBrush" Value="#34445D"/><Setter Property="Padding" Value="10,7"/><Setter Property="Margin" Value="0"/><Setter Property="CornerRadius" Value="7"/><Setter Property="MinHeight" Value="0"/></Style>
+    <Style Selector="Button.primary"><Setter Property="Background" Value="#6DE7CC"/><Setter Property="Foreground" Value="#101F29"/><Setter Property="BorderBrush" Value="#6DE7CC"/></Style>
+    <Style Selector="ComboBox"><Setter Property="Margin" Value="0"/><Setter Property="MinHeight" Value="0"/></Style>
+    <Style Selector="ToggleButton.neon-combo-header /template/ Border#Field"><Setter Property="Background" Value="#1B283B"/><Setter Property="BorderBrush" Value="#34445D"/><Setter Property="CornerRadius" Value="6"/><Setter Property="Padding" Value="9,7"/></Style>
+    <Style Selector="Button.target-choice"><Setter Property="Margin" Value="0,0,6,6"/><Setter Property="Padding" Value="6,10"/></Style>
+    <Style Selector="Button.target-choice.selected"><Setter Property="Background" Value="#2A3858"/><Setter Property="BorderBrush" Value="#A4B5FF"/><Setter Property="Foreground" Value="#D7DFFF"/></Style>
+    <Style Selector="TextBox"><Setter Property="Margin" Value="0,4,7,0"/></Style>
+  </UserControl.Styles>
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="views:RearActionDraft">
+      <StackPanel>
+        <CheckBox Content="启用此键的自定义动作" IsChecked="{Binding Enabled}" Margin="0,0,0,8"/>
+        <ComboBox ItemsSource="{x:Static views:ViewChoices.Actions}" DisplayMemberBinding="{Binding Label}" SelectedValueBinding="{Binding Id}" SelectedValue="{Binding Action,Mode=TwoWay}" Margin="0,0,0,10" AutomationProperties.Name="背键或C键动作类型"/>
+        <StackPanel IsVisible="{Binding HasOutput}"><TextBlock Text="输出按键 · 可多选组合" Classes="muted" Margin="0,0,0,7"/><TextBlock Text="{Binding MappingSummary}" Foreground="#A4B5FF" FontSize="12"/></StackPanel>
+        <TextBlock Text="{Binding BehaviorHint}" Classes="muted" Margin="0,5,0,8"/>
+        <UniformGrid Columns="2" IsVisible="{Binding HasOutput}">
+          <StackPanel><TextBlock Text="触发延迟 / ms" Classes="muted"/><TextBox Text="{Binding DelayMS,Mode=TwoWay}"/></StackPanel>
+          <StackPanel IsVisible="{Binding IsTimed}"><TextBlock Text="按下时长 / ms" Classes="muted"/><TextBox Text="{Binding PressMS,Mode=TwoWay}"/></StackPanel>
+          <StackPanel IsVisible="{Binding IsRepeat}" Margin="0,8,0,0"><TextBlock Text="松开间隔 / ms" Classes="muted"/><TextBox Text="{Binding GapMS,Mode=TwoWay}"/></StackPanel>
+          <StackPanel IsVisible="{Binding IsRepeat}" Margin="0,8,0,0"><TextBlock Text="次数 / 0 为持续" Classes="muted"/><TextBox Text="{Binding RepeatCount,Mode=TwoWay}"/></StackPanel>
+        </UniformGrid>
+        <StackPanel IsVisible="{Binding IsSequence}" Margin="0,12,0,0">
+          <TextBlock Text="后续动作 · 最多 16 步" Classes="muted" Margin="0,0,0,6"/>
+          <ItemsControl ItemsSource="{Binding Steps}"><ItemsControl.ItemTemplate><DataTemplate>
+            <StackPanel Margin="0,0,0,8">
+              <Grid ColumnDefinitions="*,*,30">
+                <ComboBox ItemsSource="{Binding Choices}" DisplayMemberBinding="{Binding Label}" SelectedValueBinding="{Binding Index}" SelectedValue="{Binding First,Mode=TwoWay}" Margin="0,0,6,0"/>
+                <ComboBox Grid.Column="1" ItemsSource="{Binding Choices}" DisplayMemberBinding="{Binding Label}" SelectedValueBinding="{Binding Index}" SelectedValue="{Binding Second,Mode=TwoWay}" Margin="0,0,6,0"/>
+                <Button Grid.Column="2" Content="×" Command="{Binding RemoveCommand}" Padding="3" ToolTip.Tip="删除此步"/>
+              </Grid>
+              <UniformGrid Columns="2" Margin="0,4,0,0"><StackPanel><TextBlock Text="延迟 / ms" Classes="muted"/><TextBox Text="{Binding DelayMS,Mode=TwoWay}"/></StackPanel><StackPanel><TextBlock Text="按下 / ms" Classes="muted"/><TextBox Text="{Binding PressMS,Mode=TwoWay}"/></StackPanel></UniformGrid>
+            </StackPanel>
+          </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+          <Button Content="+ 添加动作" Command="{Binding AddStepCommand}" HorizontalAlignment="Left"/>
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.DataTemplates>
+  <Border CornerRadius="16" BorderBrush="{StaticResource NeonEdge}" BorderThickness="1" ClipToBounds="True">
+    <Border.Background><LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%"><GradientStop Color="#CC11182C"/><GradientStop Color="#CC101426" Offset=".65"/><GradientStop Color="#CC1C1A36" Offset="1"/></LinearGradientBrush></Border.Background>
+    <Grid Margin="20,16" RowDefinitions="Auto,*,Auto">
+      <Grid Margin="0,0,0,14" ColumnDefinitions="*,Auto">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="配置中心" FontSize="21" FontWeight="SemiBold"/><TextBlock Text="CONTROL LAB" Foreground="#6DE7CC" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,0,0"/></StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+          <ComboBox ItemsSource="{x:Static views:ViewChoices.ProfileModes}" DisplayMemberBinding="{Binding Label}" SelectedValueBinding="{Binding Id}" SelectedValue="{Binding ConfigurationMode,Mode=TwoWay}" Width="92" Margin="0,0,8,0" AutomationProperties.Name="配置中心输出模式"/>
+          <Button Content="保存并应用" Command="{Binding SaveConfigurationCommand}" Classes="primary"/>
+        </StackPanel>
+      </Grid>
+      <ScrollViewer Name="CenterScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel>
+          <Grid Margin="0,0,0,10" ColumnDefinitions="*,Auto,Auto,Auto">
+            <StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding TestStatus}" Foreground="#9BADC5" FontSize="11"/><TextBlock Text="点选改键 · 右键拖动旋转 · 滚轮缩放" Foreground="#607590" FontSize="10" Margin="0,3,0,0"/></StackPanel>
+            <StackPanel Grid.Column="1" Margin="20,0"><TextBlock Text="回报率" Classes="muted"/><TextBlock Text="{Binding TestRate}" FontSize="16"/></StackPanel>
+            <StackPanel Grid.Column="2" Margin="0,0,20,0"><TextBlock Text="回报间隔 · P50" Classes="muted"/><TextBlock Text="{Binding TestGap}" FontSize="16"/></StackPanel>
+            <ComboBox Grid.Column="3" VerticalAlignment="Center" Width="88" SelectedIndex="{Binding SelectedSlot,Mode=TwoWay}" AutomationProperties.Name="测试实体手柄槽位"><ComboBoxItem Content="手柄 1"/><ComboBoxItem Content="手柄 2"/><ComboBoxItem Content="手柄 3"/><ComboBoxItem Content="手柄 4"/></ComboBox>
+          </Grid>
+          <Viewbox Name="DiagramViewport" Stretch="Uniform" HorizontalAlignment="Stretch"><controls:ControllerDiagram Name="TestSurface" State="{Binding State}" SeenButtons="{Binding SeenButtons}" Mappings="{Binding ConfigurationKeys}" SelectedControl="{Binding SelectedControl,Mode=TwoWay}" IsEditing="{Binding IsKeyEditorOpen}" SelectControlCommand="{Binding SelectControlCommand}" Width="1400" Height="670" AutomationProperties.Name="NS2 Pro 键位图，点选标签编辑；方向键切换，回车打开"/></Viewbox>
+          <Button Content="复位视角" Click="ResetView_Click" HorizontalAlignment="Right" Padding="8,3" FontSize="10" MinHeight="0" Margin="0,4,0,-24"/>
+          <Expander Header="输入详情" Foreground="#8093AF" Margin="0,8,0,0">
+            <StackPanel Margin="0,8,0,0">
+              <TextBlock Text="{Binding TestOutputSummary}" Foreground="#A6ABF5" FontSize="11" Margin="0,0,0,6"/>
+              <StackPanel IsVisible="{Binding IsWindows}">
+                <ComboBox SelectedIndex="{Binding SelectedXInputIndex,Mode=TwoWay}" Width="105" HorizontalAlignment="Left" AutomationProperties.Name="Windows XInput 槽位"><ComboBoxItem Content="XInput 0"/><ComboBoxItem Content="XInput 1"/><ComboBoxItem Content="XInput 2"/><ComboBoxItem Content="XInput 3"/></ComboBox>
+                <TextBlock Text="{Binding ActualOutputSummary}" FontSize="11" Margin="0,6,0,5"/>
+              </StackPanel>
+              <TextBlock Text="{Binding TestTiming}" Classes="muted"/><TextBlock Text="{Binding TestAxes}" FontSize="11" Margin="0,5,0,0"/><TextBlock Text="{Binding TestTriggers}" FontSize="11"/><TextBlock Text="{Binding TestProcessing}" FontSize="11"/>
+              <TextBlock Text="回报间隔与按键到画面的总延迟分别记录。模型显示实体输入，实际提交显示当前虚拟手柄输出。" Classes="muted" Margin="0,7,0,6"/>
+              <Button Content="清除已测记录" Command="{Binding ClearSeenCommand}" HorizontalAlignment="Left"/>
+            </StackPanel>
+          </Expander>
+        </StackPanel>
+      </ScrollViewer>
+      <Border Grid.Row="2" BorderBrush="#2A3850" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,9,0,0">
+        <Grid ColumnDefinitions="*,Auto"><StackPanel VerticalAlignment="Center"><StackPanel Orientation="Horizontal"><TextBlock Text="{Binding ConfigurationModeLabel,StringFormat={}{0} 配置}" Classes="muted"/><TextBlock Text="{Binding ConfigurationDraftStatus}" Foreground="#A6ABF5" FontSize="11" Margin="14,0,0,0"/></StackPanel><TextBlock Text="{Binding ConfigurationStatus}" Foreground="#6DE7CC" FontSize="11" Margin="0,4,8,0"/></StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top"><Button Content="停止动作" Command="{Binding CancelRearButtonsCommand}" Margin="0,0,7,0" ToolTip.Tip="停止正在执行的背键或 C 键动作"/><Button Content="重置配置" Command="{Binding ResetConfigurationCommand}"/></StackPanel>
+        </Grid>
+      </Border>
+      <Grid Grid.RowSpan="3" ZIndex="20" IsVisible="{Binding IsKeyEditorOpen}" Background="#18101A2B" PointerPressed="MappingBackdrop_PointerPressed">
+        <Border Width="360" MaxHeight="610" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,18,0" Background="#152136" BorderBrush="#536286" BorderThickness="1" CornerRadius="14" Padding="17" BoxShadow="0 6 25 0 #66000000">
+          <Grid RowDefinitions="Auto,*,Auto">
+            <DockPanel Margin="0,0,0,4"><Button Content="×" DockPanel.Dock="Right" Command="{Binding CloseKeyEditorCommand}" Padding="8,2" AutomationProperties.Name="关闭键位选单"/><StackPanel><TextBlock Text="{Binding SelectedConfigurationKey.Label,StringFormat=实体键 {0}}" Foreground="#D4DEFF" FontSize="19" FontWeight="SemiBold"/><TextBlock Text="{Binding ConfigurationModeLabel,StringFormat=选择 {0} 输出}" Foreground="#8D9DB8" FontSize="11" Margin="0,4,0,0"/></StackPanel></DockPanel>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel>
+                <TextBlock Text="点选输出键 · 展开进阶后可多选" Foreground="#8D9DB8" FontSize="11" Margin="0,12,0,8"/>
+                <ItemsControl ItemsSource="{Binding QuickTargets}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="4"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Button Content="{Binding Label}" Tag="{Binding Index}" Click="ChooseTarget_Click" Classes="target-choice" Classes.selected="{Binding Selected}"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                <Expander Name="AdvancedEditor" Header="组合 / 进阶动作" Foreground="#A4B5FF" Margin="0,7,0,0" IsExpanded="{Binding AdvancedEditorExpanded,Mode=TwoWay}">
+                  <StackPanel Margin="0,10,0,0">
+                    <StackPanel IsVisible="{Binding IsStandardKeySelected}"><TextBlock Text="在上方多选组合输出" Classes="muted" Margin="0,0,0,7"/><TextBlock Text="ABXY 快捷布局" Classes="muted" Margin="0,10,0,6"/><UniformGrid Columns="2"><Button Content="匹配字母" Command="{Binding LetterLayoutCommand}" Margin="0,0,7,0"/><Button Content="匹配位置" Command="{Binding PositionLayoutCommand}"/></UniformGrid></StackPanel>
+                    <ContentControl Content="{Binding SelectedRearEditor}" IsVisible="{Binding IsRearKeySelected}" HorizontalContentAlignment="Stretch"/>
+                  </StackPanel>
+                </Expander>
+              </StackPanel>
+            </ScrollViewer>
+            <Border Grid.Row="2" BorderBrush="#304057" BorderThickness="0,1,0,0" Margin="0,14,0,0" Padding="0,12,0,0"><StackPanel><UniformGrid Columns="3"><Button Content="恢复默认" Command="{Binding RestoreSelectedControlCommand}" Margin="0,0,6,0"/><Button Content="禁用" Command="{Binding DisableSelectedControlCommand}" Margin="0,0,6,0"/><Button Content="完成" Command="{Binding CloseKeyEditorCommand}" Classes="primary"/></UniformGrid><TextBlock Text="修改保留为草稿，保存并应用后生效" Foreground="#7E90AB" FontSize="10" Margin="0,10,0,0"/></StackPanel></Border>
+          </Grid>
+        </Border>
+      </Grid>
+    </Grid>
+  </Border>
+</UserControl>

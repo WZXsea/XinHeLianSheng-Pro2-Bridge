@@ -2231,6 +2231,9 @@ public sealed partial class Pro2BleInputSource :
         return false;
     }
 
+    // Read-only factory evidence. The original parser calibrates stationary bias separately.
+    public event Action<uint, byte[]>? FactoryCalibrationReceived;
+
     private async Task ReadAndLogImuCalibrationBlockAsync(
         GattCharacteristic command,
         uint baseAddress,
@@ -2283,6 +2286,12 @@ public sealed partial class Pro2BleInputSource :
 
         progress.Report("[PRO2_IMU_FLASH_BLOCK] base=0x" + baseAddress.ToString("X8") +
                         " length=" + length + " data=" + Convert.ToHexString(block));
+        var factoryObserver = FactoryCalibrationReceived;
+        if (factoryObserver != null)
+        {
+            try { factoryObserver(baseAddress, (byte[])block.Clone()); }
+            catch (Exception) { /* Optional diagnostics remain isolated from physical input initialization. */ }
+        }
     }
 
     private static byte[] BuildBleFlashReadCommand(uint address)
@@ -2429,9 +2438,19 @@ public sealed partial class Pro2BleInputSource :
         ProcessInputPayload(data, isFd2, isPrimary, sender.Uuid, sender.AttributeHandle, nowTicks, now);
     }
 
+    // Optional platform-host observation before shared parsing. Subscribers receive
+    // an owned copy; a failing observer cannot interrupt the physical input owner.
+    public event Action<byte[], bool, bool>? RawInputReceived;
+
     private void ProcessInputPayload(byte[] data, bool isFd2, bool isPrimary, Guid sourceUuid,
         ushort sourceHandle, long nowTicks, DateTimeOffset now)
     {
+        var rawInputObserver = RawInputReceived;
+        if (rawInputObserver != null)
+        {
+            try { rawInputObserver((byte[])data.Clone(), isFd2, isPrimary); }
+            catch { /* Observer failure is isolated from the existing parser/queue. */ }
+        }
         string reportType = isFd2
             ? "fd2"
             : isPrimary

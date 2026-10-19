@@ -1,0 +1,49 @@
+<Project>
+  <!-- One source of truth: compile the original files for every desktop platform. -->
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/GamepadState.cs" Link="Shared/GamepadState.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2InputTransport.cs" Link="Shared/Pro2InputTransport.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/SettingsPathNormalization.cs" Link="Shared/SettingsPathNormalization.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2HidReportParser.cs" Link="Shared/Pro2HidReportParser.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2StickCalibration.cs" Link="Shared/Pro2StickCalibration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2GyroBiasCalibration.cs" Link="Shared/Pro2GyroBiasCalibration.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/ProfessionalImuPipeline.cs" Link="Shared/ProfessionalImuPipeline.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/LinkTuningOptions.cs" Link="Shared/LinkTuningOptions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/VirtualPadPackets.cs" Link="Shared/VirtualPadPackets.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/ViiperProtocolClient.cs" Link="Shared/ViiperProtocolClient.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/RearButtonMapping.cs" Link="Shared/RearButtonMapping.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/FaceButtonMapping.cs" Link="Shared/FaceButtonMapping.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/ButtonRemapping.cs" Link="Shared/ButtonRemapping.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2BleRumblePacketEncoder.cs" Link="Shared/Pro2BleRumblePacketEncoder.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2OutputPacketMapper.cs" Link="Shared/Pro2OutputPacketMapper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Switch1RumbleConverter.cs" Link="Shared/Switch1RumbleConverter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/DualSenseHapticFeedback.cs" Link="Shared/DualSenseHapticFeedback.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2QualityHapticProcessor.cs" Link="Shared/Pro2QualityHapticProcessor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2QualityMode.cs" Link="Shared/Pro2QualityMode.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/PureSoftware133Mode.cs" Link="Shared/PureSoftware133Mode.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2InputStabilityOptions.cs" Link="Shared/Pro2InputStabilityOptions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2InputStabilityFilter.cs" Link="Shared/Pro2InputStabilityFilter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/V60UserSettings.cs" Link="Shared/V60UserSettings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2BatteryStatus.cs" Link="Shared/Pro2BatteryStatus.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2ChargeStatus.cs" Link="Shared/Pro2ChargeStatus.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2DeviceInfo.cs" Link="Shared/Pro2DeviceInfo.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2InitialBatterySnapshot.cs" Link="Shared/Pro2InitialBatterySnapshot.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2RuntimeBatteryPolicy.cs" Link="Shared/Pro2RuntimeBatteryPolicy.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2UsbBatteryPolicy.cs" Link="Shared/Pro2UsbBatteryPolicy.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2SequentialInputQueue.cs" Link="Shared/Pro2SequentialInputQueue.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/InputFrameSignal.cs" Link="Shared/InputFrameSignal.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/InputContinuityPolicy.cs" Link="Shared/InputContinuityPolicy.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/InputUpdateRateWindow.cs" Link="Shared/InputUpdateRateWindow.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/NotifyGapWindow.cs" Link="Shared/NotifyGapWindow.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/BleRateStabilityMonitor.cs" Link="Shared/BleRateStabilityMonitor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2GameplayRatePolicy.cs" Link="Shared/Pro2GameplayRatePolicy.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/RumblePreviewMixer.cs" Link="Shared/RumblePreviewMixer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/ProfessionalHidReportAudit.cs" Link="Shared/ProfessionalHidReportAudit.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2ConnectionPresentation.cs" Link="Shared/Pro2ConnectionPresentation.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/DirectProgress.cs" Link="Shared/DirectProgress.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/SessionLogWriter.cs" Link="Shared/SessionLogWriter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2Fd2ResearchRecorder.cs" Link="Shared/Pro2Fd2ResearchRecorder.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/Pro2Fd2SpikeRecorder.cs" Link="Shared/Pro2Fd2SpikeRecorder.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)../../source/final-three-in-one/windows/v60_viiper_app/RecentSessionStatus.cs" Link="Shared/RecentSessionStatus.cs" />
+  </ItemGroup>
+</Project>

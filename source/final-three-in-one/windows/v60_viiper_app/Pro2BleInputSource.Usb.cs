@@ -9,7 +9,6 @@ using System.Threading.Channels;
 
 namespace Y700Switch2V60Viiper;
 
-public enum Pro2InputTransport { Auto, Bluetooth, Usb }
 
 // The historical BLE source owns the shared parser/queue. USB publishes through that
 // same path so mapping, motion, rear keys and all virtual modes receive real frames.

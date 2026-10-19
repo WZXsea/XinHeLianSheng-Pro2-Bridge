@@ -1,0 +1,19 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Pro2.Desktop.Views.EnvironmentInfoWindow" x:CompileBindings="False"
+        Title="系统与蓝牙信息" Width="800" Height="640" MinWidth="440" MinHeight="340"
+        WindowStartupLocation="CenterOwner" Background="#0D1425" Foreground="#E7EEFF"
+        FontFamily="{StaticResource NeonFont}" FontSize="14" UseLayoutRounding="True">
+  <Grid Margin="24" RowDefinitions="Auto,Auto,*,Auto">
+    <StackPanel><TextBlock Text="系统与蓝牙信息" FontSize="24" FontWeight="SemiBold"/><TextBlock Text="包含系统、驱动及每组蓝牙预设结果。直接复制即可；查看保留当前测试状态。" Foreground="#95A5C1" Margin="0,8,0,0" TextWrapping="Wrap"/></StackPanel>
+    <TextBlock Grid.Row="1" Text="{Binding EnvironmentInfoStatus}" Foreground="#9ADCCE" Margin="0,16,0,12" TextWrapping="Wrap"/>
+    <Border Grid.Row="2" Background="#172136" BorderBrush="#354460" BorderThickness="1" CornerRadius="12" Padding="14">
+      <TextBox Text="{Binding EnvironmentReportText,Mode=OneWay}" AutomationProperties.Name="系统与蓝牙详细信息" IsReadOnly="True" TextWrapping="Wrap" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Background="Transparent" BorderThickness="0" FontSize="12"/>
+    </Border>
+    <WrapPanel Grid.Row="3" Margin="0,16,0,0">
+      <Button Content="重新读取" Command="{Binding RefreshEnvironmentCommand}"/>
+      <Button Content="复制全部信息" Command="{Binding CopyEnvironmentCommand}"/>
+      <Button Content="保存信息…" Command="{Binding SaveEnvironmentCommand}"/>
+      <Button Content="返回" Click="Return_Click"/>
+    </WrapPanel>
+  </Grid>
+</Window>

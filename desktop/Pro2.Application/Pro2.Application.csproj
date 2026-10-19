@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup>
+ <ItemGroup>
+  <ProjectReference Include="../Pro2.Core/Pro2.Core.csproj" />
+  <EmbeddedResource Include="../../macos/Vendor/libvirtualhid/SOURCE_MANIFEST.json" LogicalName="Pro2.BackendManifest.json" />
+ </ItemGroup>
+</Project>

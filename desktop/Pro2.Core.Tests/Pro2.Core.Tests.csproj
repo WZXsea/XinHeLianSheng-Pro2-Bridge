@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12</LangVersion>
+    <AssemblyName>Pro2.Core.Tests</AssemblyName>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Pro2.Core/Pro2.Core.csproj" />
+    <Compile Include="../../source/final-three-in-one/tools/tests/pure_software_core_test/FaceButtonMappingRegressionTests.cs" Link="Original/FaceButtonMappingRegressionTests.cs" />
+    <Compile Include="../../source/final-three-in-one/tools/tests/pure_software_core_test/QualityRegressionTests.cs" Link="Original/QualityRegressionTests.cs" />
+  </ItemGroup>
+</Project>

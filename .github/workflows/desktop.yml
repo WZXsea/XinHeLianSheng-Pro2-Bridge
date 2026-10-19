@@ -1,0 +1,98 @@
+name: Desktop Windows and macOS
+on:
+  workflow_dispatch:
+  push:
+    branches: ['enhanced-windows', 'feature/macos-port']
+    tags: ['v1.*']
+    paths: ['desktop/**', 'macos/**', 'scripts/**', 'source/final-three-in-one/**', 'global.json', '.github/workflows/desktop.yml']
+  pull_request:
+    paths: ['desktop/**', 'macos/**', 'scripts/**', 'source/final-three-in-one/**', 'global.json', '.github/workflows/desktop.yml']
+permissions:
+  contents: read
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            rid: win-x64
+          - os: macos-15
+            rid: osx-arm64
+          - os: macos-15-intel
+            rid: osx-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            desktop
+            macos
+            scripts
+            source/final-three-in-one/windows/v60_viiper_app
+            source/final-three-in-one/tools/tests/pure_software_core_test
+            source/final-three-in-one/tools/viiper/haptic-v0.8.0
+            source/final-three-in-one/tools/usbip-win2/v0.9.7.7
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Shared business regression
+        run: dotnet run --project desktop/Pro2.Core.Tests -c Release
+      - name: Original USB handover policy regression
+        shell: bash
+        run: bash desktop/Pro2.Platform.Windows/Tests/RunPolicy.sh
+      - name: Render the same four pages and validate bindings
+        run: dotnet run --project desktop/Pro2.Desktop.Tests -c Release
+      - name: Build identical desktop UI and native adapter
+        shell: bash
+        run: bash scripts/build-desktop.sh '${{ matrix.rid }}'
+      - name: macOS protocol, transport, broker and interactive IPC tests
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          bash macos/scripts/test-core.sh
+          bash macos/scripts/test-transport.sh
+          bash macos/scripts/test-broker.sh
+          python3 macos/Tests/Pro2NativeHostTests/test_ipc.py 'artifacts/desktop/${{ matrix.rid }}/PRO2 手柄助手.app/Contents/Helpers/pro2-native-host'
+          dotnet run --project desktop/Pro2.Application.Tests -c Release -- 'artifacts/desktop/${{ matrix.rid }}/PRO2 手柄助手.app/Contents/Helpers/pro2-native-host'
+      - name: Official driver download cache and integrity checks
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          PRO2_DRIVER_URL="$(python3 -c 'import json; print(json.load(open("macos/Vendor/libvirtualhid/SOURCE_MANIFEST.json"))["source_url"])')"
+          curl --fail --location --retry 2 --max-time 120 "$PRO2_DRIVER_URL" -o "$RUNNER_TEMP/pro2-driver.dmg"
+          dotnet run --project desktop/Pro2.Application.Tests -c Release -- --installer-only "$RUNNER_TEMP/pro2-driver.dmg"
+      - name: Windows real native adapter smoke
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./desktop/Pro2.Platform.Windows/Tests/Smoke.ps1 -HostExecutable ./artifacts/desktop/win-x64/publish/native/Pro2.Platform.Windows.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PRO2-${{ matrix.rid }}
+          path: artifacts/desktop/PRO2-*-${{ matrix.rid }}.zip*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UI-${{ matrix.rid }}
+          path: artifacts/ui/
+          if-no-files-found: error
+  release-draft:
+    if: startsWith(github.ref, 'refs/tags/v1.')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: PRO2-*
+          merge-multiple: true
+          path: packages
+      - name: Create one draft release containing all three targets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "$GITHUB_REF_NAME" packages/* --draft --title "PRO2 $GITHUB_REF_NAME" --generate-notes
